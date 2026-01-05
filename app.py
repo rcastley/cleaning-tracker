@@ -501,7 +501,7 @@ def generate_invoice_html(month_entries, month_expenses, selected_year, selected
 # Page configuration
 st.set_page_config(
     page_title="Cleaning Tracker",
-    page_icon="🧹",
+    page_icon=":material/mop:",
     layout="centered"
 )
 
@@ -512,7 +512,7 @@ expenses = load_expenses()
 clients = load_clients()
 
 # Sidebar navigation
-st.sidebar.title("🧹 Tracker")
+st.sidebar.title(":material/mop: Tracker")
 page = st.sidebar.radio(
     "Menu",
     ["Log Entry", "Log Expense", "Monthly Report", "Tax Year", "View All", "Settings"],
@@ -524,7 +524,7 @@ st.sidebar.metric("Current Rate", f"{config['currency_symbol']}{config['hourly_r
 
 # ============== LOG ENTRY PAGE ==============
 if page == "Log Entry":
-    st.subheader("📝 Log Work")
+    st.subheader(":material/edit_note: Log Work")
     
     # Client selector
     client_names = get_client_names(clients)
@@ -549,7 +549,7 @@ if page == "Log Entry":
     # Compact summary line
     st.markdown(f"**{format_hours(hours)}** @ {config['currency_symbol']}{config['hourly_rate']:.2f} = **{config['currency_symbol']}{amount:.2f}**")
     
-    if st.button("💾 Save Entry", type="primary", use_container_width=True):
+    if st.button("Save Entry", type="primary", width="stretch", icon=":material/save:"):
         entry = {
             "id": datetime.now().isoformat(),
             "client_id": selected_client_id,
@@ -562,12 +562,12 @@ if page == "Log Entry":
         }
         entries.append(entry)
         save_entries(entries)
-        st.success(f"✅ Saved! {format_hours(hours)} on {work_date.strftime('%d/%m/%Y')}")
+        st.success(f"Saved! {format_hours(hours)} on {work_date.strftime('%d/%m/%Y')}", icon=":material/check_circle:")
         st.balloons()
 
 # ============== LOG EXPENSE PAGE ==============
 elif page == "Log Expense":
-    st.subheader("🧾 Log Expense")
+    st.subheader(":material/receipt_long: Log Expense")
     
     # Client selector
     client_names = get_client_names(clients)
@@ -585,7 +585,7 @@ elif page == "Log Expense":
     
     expense_description = st.text_input("Description", value="Cleaning supplies")
     
-    if st.button("💾 Save Expense", type="primary", use_container_width=True):
+    if st.button("Save Expense", type="primary", width="stretch", icon=":material/save:"):
         if expense_amount > 0:
             expense = {
                 "id": datetime.now().isoformat(),
@@ -596,7 +596,7 @@ elif page == "Log Expense":
             }
             expenses.append(expense)
             save_expenses(expenses)
-            st.success(f"✅ Saved! {config['currency_symbol']}{expense_amount:.2f}")
+            st.success(f"Saved! {config['currency_symbol']}{expense_amount:.2f}", icon=":material/check_circle:")
             st.balloons()
         else:
             st.error("Please enter an amount greater than zero.")
@@ -619,7 +619,7 @@ elif page == "Log Expense":
 
 # ============== MONTHLY REPORT PAGE ==============
 elif page == "Monthly Report":
-    st.subheader("📊 Monthly Report")
+    st.subheader(":material/bar_chart: Monthly Report")
     
     if not entries and not expenses:
         st.info("No entries logged yet. Start by logging your first work entry!")
@@ -713,7 +713,7 @@ elif page == "Monthly Report":
             
             # Invoice section - only show if a specific client is selected
             st.divider()
-            st.subheader("🖨️ Invoice")
+            st.subheader(":material/print: Invoice")
             
             if selected_filter_id:
                 client = get_client_by_id(clients, selected_filter_id)
@@ -756,7 +756,7 @@ elif page == "Monthly Report":
                         width: 100%;
                         margin-top: 10px;
                     ">
-                        🖨️ Print Invoice
+                        Print Invoice
                     </button>
                 """
                 
@@ -771,7 +771,7 @@ elif page == "Monthly Report":
 
 # ============== TAX YEAR PAGE ==============
 elif page == "Tax Year":
-    st.subheader("📅 Tax Year")
+    st.subheader(":material/calendar_month: Tax Year")
     
     if not entries and not expenses:
         st.info("No entries logged yet. Start by logging your first work entry!")
@@ -877,9 +877,9 @@ elif page == "Tax Year":
 
 # ============== VIEW ALL PAGE ==============
 elif page == "View All":
-    st.subheader("📋 All Entries")
+    st.subheader(":material/list_alt: All Entries")
     
-    tab1, tab2 = st.tabs(["🧹 Work", "🧾 Expenses"])
+    tab1, tab2 = st.tabs([":material/mop: Work", ":material/receipt_long: Expenses"])
     
     with tab1:
         if not entries:
@@ -907,7 +907,7 @@ elif page == "View All":
                 for e in sorted_entries
             }
             selected_entry = st.selectbox("Select entry to delete", list(delete_options.keys()), key="del_work")
-            if st.button("🗑️ Delete Selected", key="del_work_btn"):
+            if st.button("Delete Selected", key="del_work_btn", icon=":material/delete:"):
                 entries.remove(delete_options[selected_entry])
                 save_entries(entries)
                 st.rerun()
@@ -938,16 +938,16 @@ elif page == "View All":
                 for e in sorted_expenses
             }
             selected_exp = st.selectbox("Select expense to delete", list(delete_exp_options.keys()), key="del_exp")
-            if st.button("🗑️ Delete Selected", key="del_exp_btn"):
+            if st.button("Delete Selected", key="del_exp_btn", icon=":material/delete:"):
                 expenses.remove(delete_exp_options[selected_exp])
                 save_expenses(expenses)
                 st.rerun()
 
 # ============== SETTINGS PAGE ==============
 elif page == "Settings":
-    st.subheader("⚙️ Settings")
+    st.subheader(":material/settings: Settings")
     
-    tab1, tab2, tab3, tab4 = st.tabs(["💰 Rates", "👤 You", "🏢 Clients", "💳 Payment"])
+    tab1, tab2, tab3, tab4 = st.tabs([":material/payments: Rates", ":material/person: You", ":material/group: Clients", ":material/credit_card: Payment"])
     
     with tab1:
         col1, col2 = st.columns(2)
@@ -1007,7 +1007,7 @@ elif page == "Settings":
             if len(clients) > 1:
                 del_client_names = {c['name']: c['id'] for c in clients}
                 del_selected = st.selectbox("Select client to delete", list(del_client_names.keys()), key="del_client")
-                if st.button("🗑️ Delete Client"):
+                if st.button("Delete Client", icon=":material/delete:"):
                     updated_clients = [c for c in clients if c['id'] != del_client_names[del_selected]]
                     save_clients(updated_clients)
                     st.rerun()
@@ -1017,7 +1017,7 @@ elif page == "Settings":
         new_client_name = st.text_input("Client Name", key="new_client_name")
         new_client_address = st.text_area("Client Address", height=80, key="new_client_addr")
         
-        if st.button("➕ Add Client"):
+        if st.button("Add Client", icon=":material/add:"):
             if new_client_name:
                 new_client = {
                     "id": datetime.now().strftime("%Y%m%d%H%M%S"),
@@ -1026,7 +1026,7 @@ elif page == "Settings":
                 }
                 clients.append(new_client)
                 save_clients(clients)
-                st.success(f"✅ Added {new_client_name}")
+                st.success(f"Added {new_client_name}", icon=":material/check_circle:")
                 st.rerun()
             else:
                 st.error("Please enter a client name")
@@ -1043,7 +1043,7 @@ elif page == "Settings":
         
         new_payment_terms = st.number_input("Payment Terms (days)", min_value=0, max_value=90, value=config.get('payment_terms', 14))
     
-    if st.button("💾 Save Settings", type="primary", use_container_width=True):
+    if st.button("Save Settings", type="primary", width="stretch", icon=":material/save:"):
         config['hourly_rate'] = new_rate
         config['currency_symbol'] = new_currency
         config['tax_year_start_month'] = new_tax_month
@@ -1058,7 +1058,7 @@ elif page == "Settings":
         config['account_number'] = new_account_number
         config['payment_terms'] = new_payment_terms
         save_config(config)
-        st.success("✅ Saved!")
+        st.success("Saved!", icon=":material/check_circle:")
         st.rerun()
     
     st.divider()
@@ -1066,10 +1066,10 @@ elif page == "Settings":
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🗑️ Clear Entries"):
+        if st.button("Clear Entries", icon=":material/delete:"):
             st.session_state.confirm_delete = "entries"
     with col2:
-        if st.button("🗑️ Clear Expenses"):
+        if st.button("Clear Expenses", icon=":material/delete:"):
             st.session_state.confirm_delete = "expenses"
     
     if st.session_state.get('confirm_delete') == "entries":
