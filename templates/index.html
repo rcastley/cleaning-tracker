@@ -13,6 +13,8 @@
     [x-cloak] { display: none !important; }
     .icon { font-family: 'Material Symbols Rounded'; font-size: 24px; vertical-align: middle; }
     input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(30%); }
+    /* Prevent iOS native inputs from overflowing containers */
+    input, select, textarea { box-sizing: border-box; max-width: 100%; }
     html, body { overscroll-behavior: none; }
     html { height: 100%; overflow: hidden; }
     body { height: 100%; overflow-y: auto; }
@@ -70,7 +72,7 @@
       </div>
 
       <!-- === WORK FORM === -->
-      <form x-show="logMode === 'work'" @submit.prevent="saveWork()" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+      <form x-show="logMode === 'work'" @submit.prevent="saveWork()" class="bg-white rounded-lg shadow-sm p-4 space-y-4 overflow-hidden">
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Date</label>
           <input type="date" x-model="workDate" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -100,7 +102,7 @@
       </form>
 
       <!-- === EXPENSE FORM === -->
-      <form x-show="logMode === 'expense'" @submit.prevent="saveExpense()" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+      <form x-show="logMode === 'expense'" @submit.prevent="saveExpense()" class="bg-white rounded-lg shadow-sm p-4 space-y-4 overflow-hidden">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date</label>
