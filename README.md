@@ -18,11 +18,13 @@ A simple Streamlit application to track hours worked for cleaning jobs, generate
 1. Make sure you have Python 3.8+ installed
 
 2. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 3. Run the application:
+
    ```bash
    streamlit run app.py
    ```
@@ -32,6 +34,7 @@ A simple Streamlit application to track hours worked for cleaning jobs, generate
 ## Data Storage
 
 The app stores data in JSON files in a `data` folder:
+
 - `entries.json` - All your logged work entries
 - `expenses.json` - All your logged expenses
 - `clients.json` - Your client list
@@ -46,6 +49,7 @@ To backup your data, simply copy the `data` folder. To restore, replace the `dat
 ## Configuration
 
 Default settings (can be changed in the Settings page):
+
 - Hourly rate: £15.00
 - Currency: £ (GBP)
 - Tax year starts: April (UK tax year)

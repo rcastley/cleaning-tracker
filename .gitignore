@@ -1,2 +1,6 @@
 .venv/
-*.json
+data/*.json
+backups/
+__pycache__/
+*.pyc
+.claude

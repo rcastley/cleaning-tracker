@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Cleaning Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap">
+  <style>
+    [x-cloak] { display: none !important; }
+    .icon { font-family: 'Material Symbols Rounded'; font-size: 24px; vertical-align: middle; }
+    input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(30%); }
+    html, body { overscroll-behavior: none; }
+    html { height: 100%; overflow: hidden; }
+    body { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+<body class="bg-gray-50 pb-20 md:pb-4 md:pt-16" x-data="app()" x-cloak>
+
+  <!-- ===== DESKTOP TOP NAV ===== -->
+  <nav class="hidden md:flex fixed top-0 inset-x-0 bg-white border-b border-gray-200 z-40 items-center px-6 h-14">
+    <span class="font-bold text-blue-600 text-lg mr-8">Cleaning Tracker</span>
+    <template x-for="t in tabs" :key="t.id">
+      <button @click="tab = t.id; onTabSwitch(t.id)" :class="tab === t.id ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
+        class="px-4 h-14 font-medium text-sm transition-colors" x-text="t.label"></button>
+    </template>
+    <span class="ml-auto text-sm text-gray-400" x-text="config.business_name"></span>
+  </nav>
+
+  <!-- ===== MOBILE HEADER ===== -->
+  <header class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200 px-4 h-12 flex items-center justify-between">
+    <span class="font-bold text-blue-600">Cleaning Tracker</span>
+    <span class="text-xs text-gray-400" x-text="config.business_name"></span>
+  </header>
+
+  <!-- ===== TOAST ===== -->
+  <div x-show="toast.show" x-transition:enter="transition ease-out duration-200" x-transition:leave="transition ease-in duration-150"
+    class="fixed top-14 md:top-16 inset-x-4 md:inset-x-auto md:right-6 md:w-80 z-50 rounded-lg shadow-lg px-4 py-3 text-sm font-medium text-white"
+    :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'" x-text="toast.msg">
+  </div>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="max-w-2xl mx-auto px-4 pt-4">
+
+    <!-- =========== LOG TAB =========== -->
+    <section x-show="tab === 'log'">
+      <!-- Work / Expense toggle -->
+      <div class="flex bg-gray-100 rounded-lg p-1 mb-4">
+        <button @click="logMode = 'work'" :class="logMode === 'work' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
+          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Work</button>
+        <button @click="logMode = 'expense'" :class="logMode === 'expense' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
+          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Expense</button>
+      </div>
+
+      <!-- Client selector -->
+      <div class="mb-4">
+        <select x-model="logClientId"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+          <template x-for="c in clients" :key="c.id">
+            <option :value="c.id" x-text="c.name"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- === WORK FORM === -->
+      <div x-show="logMode === 'work'" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Date</label>
+          <input type="date" x-model="workDate" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Start</label>
+            <input type="time" x-model="workStart" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">End</label>
+            <input type="time" x-model="workEnd" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+        </div>
+        <!-- Live preview -->
+        <div class="text-center py-2 bg-blue-50 rounded-lg">
+          <span class="text-lg font-bold text-blue-700" x-text="previewHours"></span>
+          <span class="text-gray-500 mx-1">@</span>
+          <span class="text-gray-600" x-text="config.currency_symbol + (config.hourly_rate ?? 0).toFixed(2)"></span>
+          <span class="text-gray-500 mx-1">=</span>
+          <span class="text-lg font-bold text-emerald-600" x-text="config.currency_symbol + previewAmount"></span>
+        </div>
+        <button @click="saveWork()" :disabled="saving"
+          class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-colors">
+          Save Entry
+        </button>
+      </div>
+
+      <!-- === EXPENSE FORM === -->
+      <div x-show="logMode === 'expense'" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Date</label>
+            <input type="date" x-model="expDate" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Amount</label>
+            <input type="number" step="0.50" min="0" x-model.number="expAmount" placeholder="0.00"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Description</label>
+          <input type="text" x-model="expDesc"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <button @click="saveExpense()" :disabled="saving || expAmount <= 0"
+          class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-colors">
+          Save Expense
+        </button>
+      </div>
+    </section>
+
+    <!-- =========== REPORTS TAB =========== -->
+    <section x-show="tab === 'reports'">
+      <!-- Monthly / Tax Year toggle -->
+      <div class="flex bg-gray-100 rounded-lg p-1 mb-4">
+        <button @click="reportMode = 'monthly'; loadMonthly()" :class="reportMode === 'monthly' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
+          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Monthly</button>
+        <button @click="reportMode = 'taxyear'; loadTaxYear()" :class="reportMode === 'taxyear' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
+          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Tax Year</button>
+      </div>
+
+      <!-- Client filter -->
+      <div x-show="clients.length > 1" class="mb-4">
+        <select x-model="reportClientId" @change="reportMode === 'monthly' ? loadMonthly() : loadTaxYear()"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+          <option value="">All Clients</option>
+          <template x-for="c in clients" :key="c.id">
+            <option :value="c.id" x-text="c.name"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- === MONTHLY === -->
+      <div x-show="reportMode === 'monthly'">
+        <select x-model="selectedMonth" @change="loadMonthly()"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white mb-4 focus:ring-2 focus:ring-blue-500">
+          <template x-for="m in monthlyData.available_months" :key="m.year + '-' + m.month">
+            <option :value="m.year + '-' + m.month" x-text="m.label"></option>
+          </template>
+        </select>
+
+        <!-- Metrics -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-gray-800" x-text="monthlyData.sessions"></div>
+            <div class="text-xs text-gray-500">Sessions</div>
+          </div>
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-gray-800" x-text="monthlyData.total_hours_fmt"></div>
+            <div class="text-xs text-gray-500">Hours</div>
+          </div>
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-gray-800" x-text="monthlyData.currency + monthlyData.total_expenses.toFixed(2)"></div>
+            <div class="text-xs text-gray-500">Expenses</div>
+          </div>
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-emerald-600" x-text="monthlyData.currency + monthlyData.total_amount.toFixed(2)"></div>
+            <div class="text-xs text-gray-500">Total</div>
+          </div>
+        </div>
+
+        <!-- Sessions list -->
+        <div x-show="monthlyData.entries.length" class="bg-white rounded-lg shadow-sm mb-4 overflow-hidden">
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">Sessions</div>
+          <template x-for="e in monthlyData.entries" :key="e.id">
+            <div class="px-4 py-2.5 border-b border-gray-50 flex justify-between items-center">
+              <div>
+                <span class="text-sm font-medium text-gray-800" x-text="fmtDate(e.date)"></span>
+                <span class="text-xs text-gray-400 ml-2" x-text="e.start_time + '-' + e.end_time"></span>
+              </div>
+              <span class="text-sm font-semibold text-gray-700" x-text="monthlyData.currency + e.amount.toFixed(2)"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Expenses list -->
+        <div x-show="monthlyData.expenses.length" class="bg-white rounded-lg shadow-sm mb-4 overflow-hidden">
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">Expenses</div>
+          <template x-for="e in monthlyData.expenses" :key="e.id">
+            <div class="px-4 py-2.5 border-b border-gray-50 flex justify-between items-center">
+              <div>
+                <span class="text-sm font-medium text-gray-800" x-text="fmtDate(e.date)"></span>
+                <span class="text-xs text-gray-400 ml-2" x-text="e.description"></span>
+              </div>
+              <span class="text-sm font-semibold text-gray-700" x-text="monthlyData.currency + e.amount.toFixed(2)"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Invoice button -->
+        <div x-show="reportClientId && monthlyData.sessions > 0" class="mb-4">
+          <button @click="openInvoice()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg text-base transition-colors">
+            View Invoice
+          </button>
+          <p class="text-xs text-gray-400 text-center mt-1">Opens in new tab for printing</p>
+        </div>
+        <p x-show="!reportClientId && monthlyData.sessions > 0" class="text-sm text-gray-400 text-center py-2">Select a specific client to generate an invoice.</p>
+      </div>
+
+      <!-- === TAX YEAR === -->
+      <div x-show="reportMode === 'taxyear'">
+        <select x-model="selectedTaxYear" @change="loadTaxYear()"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white mb-4 focus:ring-2 focus:ring-blue-500">
+          <template x-for="ty in taxYearData.available_tax_years" :key="ty.year">
+            <option :value="ty.year" x-text="ty.label"></option>
+          </template>
+        </select>
+
+        <!-- Metrics -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-gray-800" x-text="taxYearData.sessions"></div>
+            <div class="text-xs text-gray-500">Sessions</div>
+          </div>
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-gray-800" x-text="taxYearData.total_hours_fmt"></div>
+            <div class="text-xs text-gray-500">Hours</div>
+          </div>
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-gray-800" x-text="taxYearData.currency + taxYearData.total_expenses.toFixed(2)"></div>
+            <div class="text-xs text-gray-500">Expenses</div>
+          </div>
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-emerald-600" x-text="taxYearData.currency + taxYearData.total_amount.toFixed(2)"></div>
+            <div class="text-xs text-gray-500">Total</div>
+          </div>
+        </div>
+
+        <!-- Monthly breakdown -->
+        <div x-show="taxYearData.breakdown.length" class="bg-white rounded-lg shadow-sm overflow-hidden mb-4">
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">Monthly Breakdown</div>
+          <template x-for="m in taxYearData.breakdown" :key="m.label">
+            <div class="px-4 py-2.5 border-b border-gray-50 flex justify-between items-center">
+              <div>
+                <span class="text-sm font-medium text-gray-800" x-text="m.label"></span>
+                <span class="text-xs text-gray-400 ml-2" x-text="m.sessions + ' sessions, ' + m.hours_fmt"></span>
+              </div>
+              <span class="text-sm font-semibold text-gray-700" x-text="taxYearData.currency + m.total.toFixed(2)"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========== HISTORY TAB =========== -->
+    <section x-show="tab === 'history'">
+      <!-- Work / Expenses toggle -->
+      <div class="flex bg-gray-100 rounded-lg p-1 mb-4">
+        <button @click="historyMode = 'work'" :class="historyMode === 'work' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
+          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Work</button>
+        <button @click="historyMode = 'expenses'" :class="historyMode === 'expenses' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
+          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Expenses</button>
+      </div>
+
+      <!-- Work history -->
+      <div x-show="historyMode === 'work'">
+        <p x-show="!entries.length" class="text-center text-gray-400 py-8">No work entries yet.</p>
+        <div class="space-y-2">
+          <template x-for="e in sortedEntries" :key="e.id">
+            <div class="bg-white rounded-lg shadow-sm px-4 py-3 flex items-center justify-between">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-gray-800" x-text="fmtDate(e.date)"></span>
+                  <span x-show="clients.length > 1" class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded" x-text="clientName(e.client_id)"></span>
+                </div>
+                <div class="text-xs text-gray-400" x-text="e.start_time + '-' + e.end_time + ' (' + fmtHours(e.hours) + ')'"></div>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-sm font-semibold text-gray-700" x-text="config.currency_symbol + e.amount.toFixed(2)"></span>
+                <button @click="deleteEntry(e.id)" class="text-red-400 hover:text-red-600 p-1 -mr-1">
+                  <span class="icon text-xl">delete</span>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Expenses history -->
+      <div x-show="historyMode === 'expenses'">
+        <p x-show="!expenses.length" class="text-center text-gray-400 py-8">No expenses yet.</p>
+        <div class="space-y-2">
+          <template x-for="e in sortedExpenses" :key="e.id">
+            <div class="bg-white rounded-lg shadow-sm px-4 py-3 flex items-center justify-between">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-gray-800" x-text="fmtDate(e.date)"></span>
+                  <span x-show="clients.length > 1" class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded" x-text="clientName(e.client_id)"></span>
+                </div>
+                <div class="text-xs text-gray-400" x-text="e.description"></div>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-sm font-semibold text-gray-700" x-text="config.currency_symbol + e.amount.toFixed(2)"></span>
+                <button @click="deleteExpense(e.id)" class="text-red-400 hover:text-red-600 p-1 -mr-1">
+                  <span class="icon text-xl">delete</span>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========== SETTINGS TAB =========== -->
+    <section x-show="tab === 'settings'">
+
+      <!-- Rates -->
+      <details class="bg-white rounded-lg shadow-sm mb-3" open>
+        <summary class="px-4 py-3 font-medium text-gray-800 cursor-pointer select-none flex items-center justify-between">
+          Rates
+          <span class="icon text-gray-400 text-lg">expand_more</span>
+        </summary>
+        <div class="px-4 pb-4 space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Hourly Rate</label>
+              <input type="number" step="0.50" min="0" x-model.number="config.hourly_rate"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Currency</label>
+              <select x-model="config.currency_symbol"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+                <option value="£">£</option>
+                <option value="$">$</option>
+                <option value="€">€</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Tax Year Starts</label>
+              <select x-model.number="config.tax_year_start_month"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+                <template x-for="(name, i) in monthNames" :key="i">
+                  <option :value="i + 1" x-text="name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Invoice Prefix</label>
+              <input type="text" x-model="config.invoice_prefix"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Business Info -->
+      <details class="bg-white rounded-lg shadow-sm mb-3">
+        <summary class="px-4 py-3 font-medium text-gray-800 cursor-pointer select-none flex items-center justify-between">
+          Business Info
+          <span class="icon text-gray-400 text-lg">expand_more</span>
+        </summary>
+        <div class="px-4 pb-4 space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Your Name</label>
+            <input type="text" x-model="config.business_name"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Address</label>
+            <textarea x-model="config.business_address" rows="2"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+              <input type="email" x-model="config.business_email"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+              <input type="tel" x-model="config.business_phone"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Clients -->
+      <details class="bg-white rounded-lg shadow-sm mb-3">
+        <summary class="px-4 py-3 font-medium text-gray-800 cursor-pointer select-none flex items-center justify-between">
+          Clients
+          <span class="icon text-gray-400 text-lg">expand_more</span>
+        </summary>
+        <div class="px-4 pb-4">
+          <!-- Existing clients -->
+          <div class="space-y-2 mb-4">
+            <template x-for="c in clients" :key="c.id">
+              <div class="flex items-center justify-between py-2 border-b border-gray-100">
+                <div>
+                  <div class="text-sm font-medium text-gray-800" x-text="c.name"></div>
+                  <div class="text-xs text-gray-400" x-text="c.address.replace(/\n/g, ', ')"></div>
+                </div>
+                <button x-show="clients.length > 1" @click="deleteClient(c.id)" class="text-red-400 hover:text-red-600 p-1">
+                  <span class="icon text-xl">delete</span>
+                </button>
+              </div>
+            </template>
+          </div>
+          <!-- Add new -->
+          <div class="border-t border-gray-200 pt-3 space-y-3">
+            <div class="text-xs font-semibold text-gray-500 uppercase">Add Client</div>
+            <input type="text" x-model="newClientName" placeholder="Client name"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <textarea x-model="newClientAddress" placeholder="Address" rows="2"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+            <button @click="addClient()" :disabled="!newClientName.trim()"
+              class="w-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 font-medium py-2.5 rounded-lg text-sm transition-colors">
+              Add Client
+            </button>
+          </div>
+        </div>
+      </details>
+
+      <!-- Payment Details -->
+      <details class="bg-white rounded-lg shadow-sm mb-3">
+        <summary class="px-4 py-3 font-medium text-gray-800 cursor-pointer select-none flex items-center justify-between">
+          Payment Details
+          <span class="icon text-gray-400 text-lg">expand_more</span>
+        </summary>
+        <div class="px-4 pb-4 space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Bank</label>
+              <input type="text" x-model="config.bank_name"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Account Name</label>
+              <input type="text" x-model="config.account_name"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Sort Code</label>
+              <input type="text" x-model="config.sort_code"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Account No</label>
+              <input type="text" x-model="config.account_number"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Payment Terms (days)</label>
+            <input type="number" min="0" max="90" x-model.number="config.payment_terms"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+        </div>
+      </details>
+
+      <!-- Save button -->
+      <button @click="saveConfig()" :disabled="saving"
+        class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-colors mb-4">
+        Save Settings
+      </button>
+
+      <!-- Data management -->
+      <details class="bg-white rounded-lg shadow-sm mb-3">
+        <summary class="px-4 py-3 font-medium text-red-600 cursor-pointer select-none flex items-center justify-between">
+          Data Management
+          <span class="icon text-red-400 text-lg">expand_more</span>
+        </summary>
+        <div class="px-4 pb-4 space-y-3">
+          <button @click="confirmAction = 'entries'"
+            class="w-full border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2.5 rounded-lg text-sm transition-colors">
+            Clear All Entries
+          </button>
+          <button @click="confirmAction = 'expenses'"
+            class="w-full border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2.5 rounded-lg text-sm transition-colors">
+            Clear All Expenses
+          </button>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <!-- ===== CONFIRM DIALOG ===== -->
+  <div x-show="confirmAction" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="confirmAction = null">
+    <div class="bg-white rounded-xl shadow-xl mx-4 p-6 max-w-sm w-full">
+      <h3 class="text-lg font-bold text-gray-800 mb-2">Are you sure?</h3>
+      <p class="text-sm text-gray-500 mb-6" x-text="'This will permanently delete all ' + confirmAction + '.'"></p>
+      <div class="flex gap-3">
+        <button @click="confirmAction = null"
+          class="flex-1 border border-gray-300 text-gray-700 font-medium py-2.5 rounded-lg text-sm transition-colors hover:bg-gray-50">Cancel</button>
+        <button @click="clearData(confirmAction); confirmAction = null"
+          class="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DELETE CONFIRM DIALOG ===== -->
+  <div x-show="deleteConfirm.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="deleteConfirm.show = false">
+    <div class="bg-white rounded-xl shadow-xl mx-4 p-6 max-w-sm w-full">
+      <h3 class="text-lg font-bold text-gray-800 mb-2">Delete this <span x-text="deleteConfirm.type"></span>?</h3>
+      <p class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
+      <div class="flex gap-3">
+        <button @click="deleteConfirm.show = false"
+          class="flex-1 border border-gray-300 text-gray-700 font-medium py-2.5 rounded-lg text-sm transition-colors hover:bg-gray-50">Cancel</button>
+        <button @click="deleteConfirm.action(); deleteConfirm.show = false"
+          class="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MOBILE BOTTOM NAV ===== -->
+  <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-40 flex">
+    <template x-for="t in tabs" :key="t.id">
+      <button @click="tab = t.id; onTabSwitch(t.id)"
+        :class="tab === t.id ? 'text-blue-600' : 'text-gray-400'"
+        class="flex-1 flex flex-col items-center justify-center py-2 transition-colors">
+        <span class="icon text-2xl" x-text="t.icon"></span>
+        <span class="text-[10px] mt-0.5 font-medium" x-text="t.label"></span>
+      </button>
+    </template>
+  </nav>
+
+<script>
+function app() {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    // Navigation
+    tabs: [
+      { id: 'log', label: 'Log', icon: 'edit_note' },
+      { id: 'reports', label: 'Reports', icon: 'bar_chart' },
+      { id: 'history', label: 'History', icon: 'list_alt' },
+      { id: 'settings', label: 'Settings', icon: 'settings' },
+    ],
+    tab: 'log',
+
+    // State
+    config: {},
+    clients: [],
+    entries: [],
+    expenses: [],
+    saving: false,
+
+    // Log tab
+    logMode: 'work',
+    logClientId: '',
+    workDate: today,
+    workStart: '09:00',
+    workEnd: '12:00',
+    expDate: today,
+    expAmount: 0,
+    expDesc: 'Cleaning supplies',
+
+    // Reports tab
+    reportMode: 'monthly',
+    reportClientId: '',
+    selectedMonth: '',
+    selectedTaxYear: '',
+    monthlyData: { available_months: [], sessions: 0, total_hours: 0, total_hours_fmt: '0h 0m', total_labour: 0, total_expenses: 0, total_amount: 0, entries: [], expenses: [], currency: '£' },
+    taxYearData: { available_tax_years: [], sessions: 0, total_hours: 0, total_hours_fmt: '0h 0m', total_labour: 0, total_expenses: 0, total_amount: 0, breakdown: [], currency: '£' },
+
+    // History tab
+    historyMode: 'work',
+
+    // Settings tab
+    newClientName: '',
+    newClientAddress: '',
+    confirmAction: null,
+    deleteConfirm: { show: false, type: '', action: () => {} },
+
+    // Toast
+    toast: { show: false, msg: '', type: 'success' },
+
+    monthNames: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+
+    // Computed
+    get previewHours() {
+      const h = this.calcHours(this.workStart, this.workEnd);
+      const hr = Math.floor(h);
+      const mn = Math.round((h - hr) * 60);
+      return hr + 'h ' + mn + 'm';
+    },
+    get previewAmount() {
+      return (this.calcHours(this.workStart, this.workEnd) * (this.config.hourly_rate || 0)).toFixed(2);
+    },
+    get sortedEntries() {
+      return [...this.entries].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    },
+    get sortedExpenses() {
+      return [...this.expenses].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    },
+
+    // Init
+    async init() {
+      await Promise.all([this.loadConfig(), this.loadClients(), this.loadEntries(), this.loadExpenses()]);
+      if (this.clients.length) {
+        this.logClientId = this.clients[0].id;
+        if (this.clients.length === 1) this.reportClientId = this.clients[0].id;
+      }
+    },
+
+    // Data loaders
+    async loadConfig() { this.config = await this.api('/api/config'); },
+    async loadClients() { this.clients = await this.api('/api/clients'); },
+    async loadEntries() { this.entries = await this.api('/api/entries'); },
+    async loadExpenses() { this.expenses = await this.api('/api/expenses'); },
+
+    // Tab switch handler
+    onTabSwitch(id) {
+      if (id === 'reports') {
+        if (this.reportMode === 'monthly') this.loadMonthly();
+        else this.loadTaxYear();
+      } else if (id === 'history') {
+        this.loadEntries();
+        this.loadExpenses();
+      }
+    },
+
+    // Work entry
+    async saveWork() {
+      this.saving = true;
+      try {
+        const clientId = this.clients.length === 1 ? this.clients[0].id : this.logClientId;
+        await this.api('/api/entries', 'POST', {
+          client_id: clientId,
+          date: this.workDate,
+          start_time: this.workStart,
+          end_time: this.workEnd,
+        });
+        this.showToast('Entry saved!', 'success');
+        this.workDate = today;
+        this.loadEntries();
+      } catch (e) {
+        this.showToast('Failed to save', 'error');
+      }
+      this.saving = false;
+    },
+
+    // Expense
+    async saveExpense() {
+      this.saving = true;
+      try {
+        const clientId = this.clients.length === 1 ? this.clients[0].id : this.logClientId;
+        await this.api('/api/expenses', 'POST', {
+          client_id: clientId,
+          date: this.expDate,
+          amount: this.expAmount,
+          description: this.expDesc,
+        });
+        this.showToast('Expense saved!', 'success');
+        this.expAmount = 0;
+        this.expDesc = 'Cleaning supplies';
+        this.loadExpenses();
+      } catch (e) {
+        this.showToast('Failed to save', 'error');
+      }
+      this.saving = false;
+    },
+
+    // Reports
+    async loadMonthly() {
+      let url = '/api/reports/monthly?';
+      if (this.reportClientId) url += 'client_id=' + this.reportClientId + '&';
+      if (this.selectedMonth) {
+        const [y, m] = this.selectedMonth.split('-');
+        url += 'year=' + y + '&month=' + m;
+      }
+      const data = await this.api(url);
+      // Preserve selected month if still available
+      const prevMonth = this.selectedMonth;
+      this.monthlyData = data;
+      if (!prevMonth && data.available_months.length) {
+        this.selectedMonth = data.available_months[0].year + '-' + data.available_months[0].month;
+        // Reload with the selected month
+        await this.loadMonthly();
+        return;
+      }
+      const valid = data.available_months.some(m => m.year + '-' + m.month === prevMonth);
+      if (!valid && data.available_months.length) {
+        this.selectedMonth = data.available_months[0].year + '-' + data.available_months[0].month;
+        await this.loadMonthly();
+      }
+    },
+
+    async loadTaxYear() {
+      let url = '/api/reports/taxyear?';
+      if (this.reportClientId) url += 'client_id=' + this.reportClientId + '&';
+      if (this.selectedTaxYear) url += 'tax_year=' + this.selectedTaxYear;
+      const data = await this.api(url);
+      const prev = this.selectedTaxYear;
+      this.taxYearData = data;
+      if (!prev && data.available_tax_years.length) {
+        this.selectedTaxYear = String(data.available_tax_years[0].year);
+        await this.loadTaxYear();
+        return;
+      }
+      const valid = data.available_tax_years.some(ty => String(ty.year) === String(prev));
+      if (!valid && data.available_tax_years.length) {
+        this.selectedTaxYear = String(data.available_tax_years[0].year);
+        await this.loadTaxYear();
+      }
+    },
+
+    openInvoice() {
+      if (!this.selectedMonth || !this.reportClientId) return;
+      const [y, m] = this.selectedMonth.split('-');
+      window.open('/invoice?client_id=' + this.reportClientId + '&year=' + y + '&month=' + m, '_blank');
+    },
+
+    // History deletes
+    deleteEntry(id) {
+      this.deleteConfirm = {
+        show: true, type: 'entry',
+        action: async () => {
+          await this.api('/api/entries/' + encodeURIComponent(id), 'DELETE');
+          this.showToast('Entry deleted', 'success');
+          this.loadEntries();
+        }
+      };
+    },
+    deleteExpense(id) {
+      this.deleteConfirm = {
+        show: true, type: 'expense',
+        action: async () => {
+          await this.api('/api/expenses/' + encodeURIComponent(id), 'DELETE');
+          this.showToast('Expense deleted', 'success');
+          this.loadExpenses();
+        }
+      };
+    },
+
+    // Settings
+    async saveConfig() {
+      this.saving = true;
+      try {
+        this.config = await this.api('/api/config', 'PUT', this.config);
+        this.showToast('Settings saved!', 'success');
+      } catch (e) {
+        this.showToast('Failed to save', 'error');
+      }
+      this.saving = false;
+    },
+
+    async addClient() {
+      if (!this.newClientName.trim()) return;
+      await this.api('/api/clients', 'POST', { name: this.newClientName, address: this.newClientAddress });
+      this.newClientName = '';
+      this.newClientAddress = '';
+      this.showToast('Client added!', 'success');
+      this.loadClients();
+    },
+
+    deleteClient(id) {
+      this.deleteConfirm = {
+        show: true, type: 'client',
+        action: async () => {
+          await this.api('/api/clients/' + encodeURIComponent(id), 'DELETE');
+          this.showToast('Client deleted', 'success');
+          this.loadClients();
+        }
+      };
+    },
+
+    async clearData(type) {
+      await this.api('/api/' + type + '?confirm=true', 'DELETE');
+      this.showToast('All ' + type + ' cleared', 'success');
+      if (type === 'entries') this.loadEntries();
+      else this.loadExpenses();
+    },
+
+    // Helpers
+    calcHours(start, end) {
+      if (!start || !end) return 0;
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      let diff = (eh * 60 + em) - (sh * 60 + sm);
+      if (diff < 0) diff += 24 * 60;
+      return diff / 60;
+    },
+
+    fmtDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      return d + '/' + m;
+    },
+
+    fmtHours(h) {
+      const hr = Math.floor(h);
+      const mn = Math.round((h - hr) * 60);
+      return hr + 'h ' + mn + 'm';
+    },
+
+    clientName(id) {
+      const c = this.clients.find(c => c.id === id);
+      return c ? c.name : 'Unknown';
+    },
+
+    showToast(msg, type) {
+      this.toast = { show: true, msg, type };
+      setTimeout(() => this.toast.show = false, 2500);
+    },
+
+    async api(url, method = 'GET', body = null) {
+      const opts = { method, headers: {} };
+      if (body) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      }
+      const res = await fetch(url, opts);
+      if (!res.ok) throw new Error(res.statusText);
+      return res.json();
+    },
+  };
+}
+</script>
+</body>
+</html>
