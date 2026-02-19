@@ -199,7 +199,7 @@ def create_client():
     clients = load_json(CLIENTS_FILE, list(DEFAULT_CLIENTS))
 
     client = {
-        "id": datetime.now().strftime("%Y%m%d%H%M%S"),
+        "id": datetime.now().isoformat(),
         "name": data["name"],
         "address": data.get("address", ""),
     }

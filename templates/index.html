@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <title>Cleaning Tracker</title>
@@ -15,10 +15,14 @@
     input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(30%); }
     html, body { overscroll-behavior: none; }
     html { height: 100%; overflow: hidden; }
-    body { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    body { height: 100%; overflow-y: auto; }
+    body.dialog-open { overflow: hidden; }
+    /* Safe area insets for notch/Dynamic Island and home indicator */
+    .safe-top { padding-top: env(safe-area-inset-top); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
   </style>
 </head>
-<body class="bg-gray-50 pb-20 md:pb-4 md:pt-16" x-data="app()" x-cloak>
+<body class="bg-gray-50 pb-24 md:pb-4 md:pt-16" x-data="app()" x-cloak>
 
   <!-- ===== DESKTOP TOP NAV ===== -->
   <nav class="hidden md:flex fixed top-0 inset-x-0 bg-white border-b border-gray-200 z-40 items-center px-6 h-14">
@@ -31,14 +35,14 @@
   </nav>
 
   <!-- ===== MOBILE HEADER ===== -->
-  <header class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200 px-4 h-12 flex items-center justify-between">
+  <header class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200 px-4 h-12 flex items-center justify-between safe-top">
     <span class="font-bold text-blue-600">Cleaning Tracker</span>
     <span class="text-xs text-gray-400" x-text="config.business_name"></span>
   </header>
 
   <!-- ===== TOAST ===== -->
   <div x-show="toast.show" x-transition:enter="transition ease-out duration-200" x-transition:leave="transition ease-in duration-150"
-    class="fixed top-14 md:top-16 inset-x-4 md:inset-x-auto md:right-6 md:w-80 z-50 rounded-lg shadow-lg px-4 py-3 text-sm font-medium text-white"
+    class="fixed top-20 md:top-16 inset-x-4 md:inset-x-auto md:right-6 md:w-80 z-50 rounded-lg shadow-lg px-4 py-3 text-sm font-medium text-white safe-top"
     :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'" x-text="toast.msg">
   </div>
 
@@ -66,7 +70,7 @@
       </div>
 
       <!-- === WORK FORM === -->
-      <div x-show="logMode === 'work'" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+      <form x-show="logMode === 'work'" @submit.prevent="saveWork()" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Date</label>
           <input type="date" x-model="workDate" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -89,14 +93,14 @@
           <span class="text-gray-500 mx-1">=</span>
           <span class="text-lg font-bold text-emerald-600" x-text="config.currency_symbol + previewAmount"></span>
         </div>
-        <button @click="saveWork()" :disabled="saving"
-          class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-colors">
+        <button type="submit" :disabled="saving"
+          class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-all">
           Save Entry
         </button>
-      </div>
+      </form>
 
       <!-- === EXPENSE FORM === -->
-      <div x-show="logMode === 'expense'" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+      <form x-show="logMode === 'expense'" @submit.prevent="saveExpense()" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date</label>
@@ -113,11 +117,11 @@
           <input type="text" x-model="expDesc"
             class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
         </div>
-        <button @click="saveExpense()" :disabled="saving || expAmount <= 0"
-          class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-colors">
+        <button type="submit" :disabled="saving || expAmount <= 0"
+          class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-all">
           Save Expense
         </button>
-      </div>
+      </form>
     </section>
 
     <!-- =========== REPORTS TAB =========== -->
@@ -201,7 +205,7 @@
         <!-- Invoice button -->
         <div x-show="reportClientId && monthlyData.sessions > 0" class="mb-4">
           <button @click="openInvoice()"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg text-base transition-colors">
+            class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] text-white font-semibold py-3 rounded-lg text-base transition-all">
             View Invoice
           </button>
           <p class="text-xs text-gray-400 text-center mt-1">Opens in new tab for printing</p>
@@ -279,7 +283,7 @@
               </div>
               <div class="flex items-center gap-3 shrink-0">
                 <span class="text-sm font-semibold text-gray-700" x-text="config.currency_symbol + e.amount.toFixed(2)"></span>
-                <button @click="deleteEntry(e.id)" class="text-red-400 hover:text-red-600 p-1 -mr-1">
+                <button @click="deleteEntry(e.id)" class="text-red-400 hover:text-red-600 p-2 -mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
                   <span class="icon text-xl">delete</span>
                 </button>
               </div>
@@ -303,7 +307,7 @@
               </div>
               <div class="flex items-center gap-3 shrink-0">
                 <span class="text-sm font-semibold text-gray-700" x-text="config.currency_symbol + e.amount.toFixed(2)"></span>
-                <button @click="deleteExpense(e.id)" class="text-red-400 hover:text-red-600 p-1 -mr-1">
+                <button @click="deleteExpense(e.id)" class="text-red-400 hover:text-red-600 p-2 -mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
                   <span class="icon text-xl">delete</span>
                 </button>
               </div>
@@ -405,7 +409,7 @@
                   <div class="text-sm font-medium text-gray-800" x-text="c.name"></div>
                   <div class="text-xs text-gray-400" x-text="c.address.replace(/\n/g, ', ')"></div>
                 </div>
-                <button x-show="clients.length > 1" @click="deleteClient(c.id)" class="text-red-400 hover:text-red-600 p-1">
+                <button x-show="clients.length > 1" @click="deleteClient(c.id)" class="text-red-400 hover:text-red-600 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
                   <span class="icon text-xl">delete</span>
                 </button>
               </div>
@@ -467,7 +471,7 @@
 
       <!-- Save button -->
       <button @click="saveConfig()" :disabled="saving"
-        class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-colors mb-4">
+        class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-all mb-4">
         Save Settings
       </button>
 
@@ -492,7 +496,7 @@
   </main>
 
   <!-- ===== CONFIRM DIALOG ===== -->
-  <div x-show="confirmAction" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="confirmAction = null">
+  <div x-show="confirmAction" x-effect="document.body.classList.toggle('dialog-open', !!confirmAction || deleteConfirm.show)" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="confirmAction = null">
     <div class="bg-white rounded-xl shadow-xl mx-4 p-6 max-w-sm w-full">
       <h3 class="text-lg font-bold text-gray-800 mb-2">Are you sure?</h3>
       <p class="text-sm text-gray-500 mb-6" x-text="'This will permanently delete all ' + confirmAction + '.'"></p>
@@ -506,7 +510,7 @@
   </div>
 
   <!-- ===== DELETE CONFIRM DIALOG ===== -->
-  <div x-show="deleteConfirm.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="deleteConfirm.show = false">
+  <div x-show="deleteConfirm.show" x-effect="document.body.classList.toggle('dialog-open', !!confirmAction || deleteConfirm.show)" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="deleteConfirm.show = false">
     <div class="bg-white rounded-xl shadow-xl mx-4 p-6 max-w-sm w-full">
       <h3 class="text-lg font-bold text-gray-800 mb-2">Delete this <span x-text="deleteConfirm.type"></span>?</h3>
       <p class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
@@ -520,13 +524,13 @@
   </div>
 
   <!-- ===== MOBILE BOTTOM NAV ===== -->
-  <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-40 flex">
+  <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-40 flex safe-bottom">
     <template x-for="t in tabs" :key="t.id">
       <button @click="tab = t.id; onTabSwitch(t.id)"
         :class="tab === t.id ? 'text-blue-600' : 'text-gray-400'"
         class="flex-1 flex flex-col items-center justify-center py-2 transition-colors">
         <span class="icon text-2xl" x-text="t.icon"></span>
-        <span class="text-[10px] mt-0.5 font-medium" x-text="t.label"></span>
+        <span class="text-[11px] mt-0.5 font-medium" x-text="t.label"></span>
       </button>
     </template>
   </nav>
