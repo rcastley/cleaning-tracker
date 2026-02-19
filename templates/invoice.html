@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice {{ invoice_number }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        @page {
+            size: A4;
+            margin: 10mm;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.3;
+            color: #333;
+            padding: 15px;
+            max-width: 210mm;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2563eb;
+        }
+        .invoice-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        .business-details {
+            text-align: right;
+            font-size: 10px;
+        }
+        .business-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 2px;
+        }
+        .addresses {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .address-block {
+            width: 48%;
+        }
+        .address-label {
+            font-weight: bold;
+            color: #6b7280;
+            font-size: 9px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+        .invoice-meta {
+            background: #f3f4f6;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .meta-item {
+            text-align: center;
+        }
+        .meta-label {
+            font-size: 8px;
+            color: #6b7280;
+            text-transform: uppercase;
+        }
+        .meta-value {
+            font-size: 12px;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        th {
+            background: #1e40af;
+            color: white;
+            padding: 6px 8px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 10px;
+        }
+        th.right, td.right {
+            text-align: right;
+        }
+        td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 10px;
+        }
+        tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        .expenses-section {
+            margin-bottom: 10px;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 11px;
+            color: #1e40af;
+            margin-bottom: 6px;
+            margin-top: 8px;
+        }
+        .expenses-table th {
+            background: #059669;
+        }
+        .totals {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 12px;
+        }
+        .totals-box {
+            width: 220px;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .total-row.grand-total {
+            font-size: 14px;
+            font-weight: bold;
+            color: #1e40af;
+            border-bottom: 2px solid #2563eb;
+            border-top: 2px solid #2563eb;
+            padding: 8px 0;
+            margin-top: 4px;
+        }
+        .payment-details {
+            background: #eff6ff;
+            padding: 10px 12px;
+            border-radius: 4px;
+            border-left: 3px solid #2563eb;
+        }
+        .payment-title {
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #1e40af;
+            font-size: 11px;
+        }
+        .payment-grid {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 2px;
+            font-size: 10px;
+        }
+        .payment-label {
+            color: #6b7280;
+        }
+        .payment-note {
+            margin-top: 6px;
+            font-size: 9px;
+            color: #6b7280;
+        }
+        .footer {
+            margin-top: 15px;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 10px;
+        }
+        @media print {
+            body {
+                padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .header {
+                margin-bottom: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="invoice-title">INVOICE</div>
+        <div class="business-details">
+            <div class="business-name">{{ config.business_name }}</div>
+            <div>{{ config.business_address | nl2br }}</div>
+            <div>{{ config.business_email }}</div>
+            <div>{{ config.business_phone }}</div>
+        </div>
+    </div>
+
+    <div class="addresses">
+        <div class="address-block">
+            <div class="address-label">Bill To</div>
+            <div><strong>{{ client.name }}</strong></div>
+            <div>{{ client.address | nl2br }}</div>
+        </div>
+    </div>
+
+    <div class="invoice-meta">
+        <div class="meta-item">
+            <div class="meta-label">Invoice Number</div>
+            <div class="meta-value">{{ invoice_number }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">Invoice Date</div>
+            <div class="meta-value">{{ invoice_date }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">Period</div>
+            <div class="meta-value">{{ month_name }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">Due Date</div>
+            <div class="meta-value">{{ due_date }}</div>
+        </div>
+    </div>
+
+    <div class="section-title">Labour</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th class="right">Hours</th>
+                <th class="right">Rate</th>
+                <th class="right">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr>
+                <td>{{ entry.date }}</td>
+                <td>Cleaning Services ({{ entry.start_time }} - {{ entry.end_time }})</td>
+                <td class="right">{{ "%.2f"|format(entry.hours) }}</td>
+                <td class="right">{{ currency }}{{ "%.2f"|format(entry.hourly_rate) }}</td>
+                <td class="right">{{ currency }}{{ "%.2f"|format(entry.amount) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if expenses %}
+    <div class="expenses-section">
+        <div class="section-title">Expenses (receipts attached)</div>
+        <table class="expenses-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th class="right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for expense in expenses %}
+                <tr>
+                    <td>{{ expense.date }}</td>
+                    <td>{{ expense.description }}</td>
+                    <td class="right">{{ currency }}{{ "%.2f"|format(expense.amount) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="totals">
+        <div class="totals-box">
+            <div class="total-row">
+                <span>Labour ({{ "%.2f"|format(total_hours) }} hrs):</span>
+                <span>{{ currency }}{{ "%.2f"|format(total_labour) }}</span>
+            </div>
+            <div class="total-row">
+                <span>Expenses:</span>
+                <span>{{ currency }}{{ "%.2f"|format(total_expenses) }}</span>
+            </div>
+            <div class="total-row grand-total">
+                <span>Total Due:</span>
+                <span>{{ currency }}{{ "%.2f"|format(total_amount) }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="payment-details">
+        <div class="payment-title">Payment Details</div>
+        <div class="payment-grid">
+            <span class="payment-label">Bank:</span>
+            <span>{{ config.bank_name }}</span>
+            <span class="payment-label">Account Name:</span>
+            <span>{{ config.account_name }}</span>
+            <span class="payment-label">Sort Code:</span>
+            <span>{{ config.sort_code }}</span>
+            <span class="payment-label">Account No:</span>
+            <span>{{ config.account_number }}</span>
+        </div>
+        <div class="payment-note">
+            Please pay within {{ config.payment_terms }} days. Use invoice number as payment reference.
+        </div>
+    </div>
+
+    <div class="footer">
+        Thank you for your business!
+    </div>
+</body>
+</html>
