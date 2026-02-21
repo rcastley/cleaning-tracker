@@ -46,7 +46,7 @@ DEFAULT_CONFIG = {
 }
 
 DEFAULT_CLIENTS = [
-    {"id": "client_1", "name": "Client 1", "address": "Address\nCity, Postcode"}
+    {"id": "client_1", "name": "Client 1", "address": "Address\nCity, Postcode", "default_miles": 0}
 ]
 
 # ---------------------------------------------------------------------------
@@ -140,6 +140,17 @@ def format_hours(hours):
 def generate_invoice_number(year, month, config):
     """Generate an invoice number based on year and month."""
     return f"{config['invoice_prefix']}-{year}{month:02d}"
+
+
+def calculate_hmrc_mileage_allowance(total_miles):
+    """Calculate HMRC approved mileage allowance for a tax year.
+
+    45p/mile for first 10,000 miles, 25p/mile thereafter.
+    Returns allowance in pounds.
+    """
+    if total_miles <= 10000:
+        return round(total_miles * 0.45, 2)
+    return round(10000 * 0.45 + (total_miles - 10000) * 0.25, 2)
 
 
 # ---------------------------------------------------------------------------

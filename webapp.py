@@ -10,6 +10,7 @@ from helpers import (
     get_client_by_id,
     calculate_hours, get_tax_year, get_tax_year_label,
     format_hours, generate_invoice_html,
+    calculate_hmrc_mileage_allowance,
 )
 
 app = Flask(__name__)
@@ -94,6 +95,7 @@ def create_entry():
         "hours": round(hours, 2),
         "hourly_rate": rate,
         "amount": round(hours * rate, 2),
+        "miles": float(data.get("miles", 0)),
     }
     entries.append(entry)
     save_json(ENTRIES_FILE, entries)
@@ -202,10 +204,28 @@ def create_client():
         "id": datetime.now().isoformat(),
         "name": data["name"],
         "address": data.get("address", ""),
+        "default_miles": float(data.get("default_miles", 0)),
     }
     clients.append(client)
     save_json(CLIENTS_FILE, clients)
     return jsonify(client), 201
+
+
+@app.route("/api/clients/<client_id>", methods=["PUT"])
+def update_client(client_id):
+    data = request.get_json(force=True)
+    clients = load_json(CLIENTS_FILE, list(DEFAULT_CLIENTS))
+    for c in clients:
+        if c["id"] == client_id:
+            if "name" in data:
+                c["name"] = data["name"]
+            if "address" in data:
+                c["address"] = data["address"]
+            if "default_miles" in data:
+                c["default_miles"] = float(data["default_miles"])
+            save_json(CLIENTS_FILE, clients)
+            return jsonify(c)
+    abort(404, "Client not found")
 
 
 @app.route("/api/clients/<client_id>", methods=["DELETE"])
@@ -258,6 +278,7 @@ def monthly_report():
     total_hours = sum(e["hours"] for e in month_entries)
     total_labour = sum(e["amount"] for e in month_entries)
     total_expenses = sum(e["amount"] for e in month_expenses)
+    total_miles = sum(e.get("miles", 0) for e in month_entries)
 
     return jsonify({
         "available_months": [{"year": y, "month": m, "label": datetime(y, m, 1).strftime("%B %Y")} for y, m in available_months],
@@ -267,6 +288,7 @@ def monthly_report():
         "total_labour": round(total_labour, 2),
         "total_expenses": round(total_expenses, 2),
         "total_amount": round(total_labour + total_expenses, 2),
+        "total_miles": round(total_miles, 1),
         "entries": sorted(month_entries, key=lambda x: x["date"]),
         "expenses": sorted(month_expenses, key=lambda x: x["date"]),
         "currency": config["currency_symbol"],
@@ -309,6 +331,8 @@ def taxyear_report():
     total_hours = sum(e["hours"] for e in ty_entries)
     total_labour = sum(e["amount"] for e in ty_entries)
     total_expenses_val = sum(e["amount"] for e in ty_expenses)
+    total_miles = sum(e.get("miles", 0) for e in ty_entries)
+    mileage_allowance = calculate_hmrc_mileage_allowance(total_miles)
 
     # Monthly breakdown
     monthly = {}
@@ -316,15 +340,16 @@ def taxyear_report():
         d = datetime.fromisoformat(e["date"])
         key = f"{d.year}-{d.month:02d}"
         if key not in monthly:
-            monthly[key] = {"year": d.year, "month": d.month, "hours": 0, "labour": 0, "expenses": 0, "sessions": 0}
+            monthly[key] = {"year": d.year, "month": d.month, "hours": 0, "labour": 0, "expenses": 0, "sessions": 0, "miles": 0}
         monthly[key]["hours"] += e["hours"]
         monthly[key]["labour"] += e["amount"]
         monthly[key]["sessions"] += 1
+        monthly[key]["miles"] += e.get("miles", 0)
     for e in ty_expenses:
         d = datetime.fromisoformat(e["date"])
         key = f"{d.year}-{d.month:02d}"
         if key not in monthly:
-            monthly[key] = {"year": d.year, "month": d.month, "hours": 0, "labour": 0, "expenses": 0, "sessions": 0}
+            monthly[key] = {"year": d.year, "month": d.month, "hours": 0, "labour": 0, "expenses": 0, "sessions": 0, "miles": 0}
         monthly[key]["expenses"] += e["amount"]
 
     breakdown = []
@@ -338,6 +363,7 @@ def taxyear_report():
             "labour": round(m["labour"], 2),
             "expenses": round(m["expenses"], 2),
             "total": round(m["labour"] + m["expenses"], 2),
+            "miles": round(m["miles"], 1),
         })
 
     return jsonify({
@@ -348,6 +374,8 @@ def taxyear_report():
         "total_labour": round(total_labour, 2),
         "total_expenses": round(total_expenses_val, 2),
         "total_amount": round(total_labour + total_expenses_val, 2),
+        "total_miles": round(total_miles, 1),
+        "mileage_allowance": mileage_allowance,
         "breakdown": breakdown,
         "currency": config["currency_symbol"],
     })

@@ -63,7 +63,7 @@
 
       <!-- Client selector -->
       <div class="mb-4">
-        <select x-model="logClientId"
+        <select x-model="logClientId" @change="updateMilesFromClient()"
           class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
           <template x-for="c in clients" :key="c.id">
             <option :value="c.id" x-text="c.name"></option>
@@ -86,6 +86,11 @@
             <label class="block text-xs font-medium text-gray-500 mb-1">End</label>
             <input type="time" x-model="workEnd" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Miles (round trip)</label>
+          <input type="number" step="0.1" min="0" x-model.number="workMiles"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
         </div>
         <!-- Live preview -->
         <div class="text-center py-2 bg-blue-50 rounded-lg">
@@ -174,6 +179,10 @@
             <div class="text-2xl font-bold text-emerald-600" x-text="monthlyData.currency + monthlyData.total_amount.toFixed(2)"></div>
             <div class="text-xs text-gray-500">Total</div>
           </div>
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center col-span-2">
+            <div class="text-2xl font-bold text-gray-800" x-text="monthlyData.total_miles + ' mi'"></div>
+            <div class="text-xs text-gray-500">Miles</div>
+          </div>
         </div>
 
         <!-- Sessions list -->
@@ -242,6 +251,14 @@
             <div class="text-2xl font-bold text-emerald-600" x-text="taxYearData.currency + taxYearData.total_amount.toFixed(2)"></div>
             <div class="text-xs text-gray-500">Total</div>
           </div>
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-gray-800" x-text="taxYearData.total_miles + ' mi'"></div>
+            <div class="text-xs text-gray-500">Total Miles</div>
+          </div>
+          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
+            <div class="text-2xl font-bold text-emerald-600" x-text="taxYearData.currency + taxYearData.mileage_allowance.toFixed(2)"></div>
+            <div class="text-xs text-gray-500">Mileage Allowance</div>
+          </div>
         </div>
 
         <!-- Monthly breakdown -->
@@ -251,7 +268,7 @@
             <div class="px-4 py-2.5 border-b border-gray-50 flex justify-between items-center">
               <div>
                 <span class="text-sm font-medium text-gray-800" x-text="m.label"></span>
-                <span class="text-xs text-gray-400 ml-2" x-text="m.sessions + ' sessions, ' + m.hours_fmt"></span>
+                <span class="text-xs text-gray-400 ml-2" x-text="m.sessions + ' sessions, ' + m.hours_fmt + ', ' + m.miles + ' mi'"></span>
               </div>
               <span class="text-sm font-semibold text-gray-700" x-text="taxYearData.currency + m.total.toFixed(2)"></span>
             </div>
@@ -281,7 +298,7 @@
                   <span class="text-sm font-medium text-gray-800" x-text="fmtDate(e.date)"></span>
                   <span x-show="clients.length > 1" class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded" x-text="clientName(e.client_id)"></span>
                 </div>
-                <div class="text-xs text-gray-400" x-text="e.start_time + '-' + e.end_time + ' (' + fmtHours(e.hours) + ')'"></div>
+                <div class="text-xs text-gray-400" x-text="e.start_time + '-' + e.end_time + ' (' + fmtHours(e.hours) + ')' + ((e.miles || 0) > 0 ? ' \u2022 ' + e.miles + ' mi' : '')"></div>
               </div>
               <div class="flex items-center gap-3 shrink-0">
                 <span class="text-sm font-semibold text-gray-700" x-text="config.currency_symbol + e.amount.toFixed(2)"></span>
@@ -407,13 +424,21 @@
           <div class="space-y-2 mb-4">
             <template x-for="c in clients" :key="c.id">
               <div class="flex items-center justify-between py-2 border-b border-gray-100">
-                <div>
+                <div class="flex-1 min-w-0">
                   <div class="text-sm font-medium text-gray-800" x-text="c.name"></div>
                   <div class="text-xs text-gray-400" x-text="c.address.replace(/\n/g, ', ')"></div>
                 </div>
-                <button x-show="clients.length > 1" @click="deleteClient(c.id)" class="text-red-400 hover:text-red-600 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
-                  <span class="icon text-xl">delete</span>
-                </button>
+                <div class="flex items-center gap-2 shrink-0">
+                  <div class="text-right">
+                    <input type="number" step="0.1" min="0" :value="c.default_miles || 0"
+                      @change="updateClientMiles(c.id, $event.target.value)"
+                      class="w-16 text-right text-sm border border-gray-200 rounded px-1 py-1 focus:ring-1 focus:ring-blue-500">
+                    <div class="text-[10px] text-gray-400">miles</div>
+                  </div>
+                  <button x-show="clients.length > 1" @click="deleteClient(c.id)" class="text-red-400 hover:text-red-600 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                    <span class="icon text-xl">delete</span>
+                  </button>
+                </div>
               </div>
             </template>
           </div>
@@ -424,6 +449,11 @@
               class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             <textarea x-model="newClientAddress" placeholder="Address" rows="2"
               class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+            <div>
+              <input type="number" step="0.1" min="0" x-model.number="newClientMiles" placeholder="Default round-trip miles"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              <div class="text-xs text-gray-400 mt-1">Default round-trip mileage (home to client and back)</div>
+            </div>
             <button @click="addClient()" :disabled="!newClientName.trim()"
               class="w-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 font-medium py-2.5 rounded-lg text-sm transition-colors">
               Add Client
@@ -563,6 +593,7 @@ function app() {
     workDate: today,
     workStart: '09:00',
     workEnd: '12:00',
+    workMiles: 0,
     expDate: today,
     expAmount: 0,
     expDesc: 'Cleaning supplies',
@@ -572,8 +603,8 @@ function app() {
     reportClientId: '',
     selectedMonth: '',
     selectedTaxYear: '',
-    monthlyData: { available_months: [], sessions: 0, total_hours: 0, total_hours_fmt: '0h 0m', total_labour: 0, total_expenses: 0, total_amount: 0, entries: [], expenses: [], currency: '£' },
-    taxYearData: { available_tax_years: [], sessions: 0, total_hours: 0, total_hours_fmt: '0h 0m', total_labour: 0, total_expenses: 0, total_amount: 0, breakdown: [], currency: '£' },
+    monthlyData: { available_months: [], sessions: 0, total_hours: 0, total_hours_fmt: '0h 0m', total_labour: 0, total_expenses: 0, total_amount: 0, total_miles: 0, entries: [], expenses: [], currency: '£' },
+    taxYearData: { available_tax_years: [], sessions: 0, total_hours: 0, total_hours_fmt: '0h 0m', total_labour: 0, total_expenses: 0, total_amount: 0, total_miles: 0, mileage_allowance: 0, breakdown: [], currency: '£' },
 
     // History tab
     historyMode: 'work',
@@ -581,6 +612,7 @@ function app() {
     // Settings tab
     newClientName: '',
     newClientAddress: '',
+    newClientMiles: 0,
     confirmAction: null,
     deleteConfirm: { show: false, type: '', action: () => {} },
 
@@ -611,6 +643,7 @@ function app() {
       await Promise.all([this.loadConfig(), this.loadClients(), this.loadEntries(), this.loadExpenses()]);
       if (this.clients.length) {
         this.logClientId = this.clients[0].id;
+        this.workMiles = this.clients[0].default_miles || 0;
         if (this.clients.length === 1) this.reportClientId = this.clients[0].id;
       }
     },
@@ -642,9 +675,11 @@ function app() {
           date: this.workDate,
           start_time: this.workStart,
           end_time: this.workEnd,
+          miles: this.workMiles,
         });
         this.showToast('Entry saved!', 'success');
         this.workDate = today;
+        this.updateMilesFromClient();
         this.loadEntries();
       } catch (e) {
         this.showToast('Failed to save', 'error');
@@ -759,9 +794,10 @@ function app() {
 
     async addClient() {
       if (!this.newClientName.trim()) return;
-      await this.api('/api/clients', 'POST', { name: this.newClientName, address: this.newClientAddress });
+      await this.api('/api/clients', 'POST', { name: this.newClientName, address: this.newClientAddress, default_miles: this.newClientMiles });
       this.newClientName = '';
       this.newClientAddress = '';
+      this.newClientMiles = 0;
       this.showToast('Client added!', 'success');
       this.loadClients();
     },
@@ -782,6 +818,17 @@ function app() {
       this.showToast('All ' + type + ' cleared', 'success');
       if (type === 'entries') this.loadEntries();
       else this.loadExpenses();
+    },
+
+    updateMilesFromClient() {
+      const client = this.clients.find(c => c.id === this.logClientId);
+      this.workMiles = client ? (client.default_miles || 0) : 0;
+    },
+
+    async updateClientMiles(clientId, miles) {
+      await this.api('/api/clients/' + encodeURIComponent(clientId), 'PUT', { default_miles: parseFloat(miles) || 0 });
+      this.showToast('Miles updated', 'success');
+      this.loadClients();
     },
 
     // Helpers
