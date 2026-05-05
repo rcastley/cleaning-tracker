@@ -30,6 +30,7 @@
 
   <!-- ===== DESKTOP TOP NAV ===== -->
   <nav class="hidden md:flex fixed top-0 inset-x-0 bg-white border-b border-gray-200 z-40 items-center px-6 h-14">
+    <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="w-7 h-7 mr-2">
     <span class="font-bold text-blue-600 text-lg mr-8">Cleaning Tracker</span>
     <template x-for="t in tabs" :key="t.id">
       <button @click="tab = t.id; onTabSwitch(t.id)" :class="tab === t.id ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
@@ -40,7 +41,10 @@
 
   <!-- ===== MOBILE HEADER ===== -->
   <header class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200 px-4 h-12 flex items-center justify-between safe-top">
-    <span class="font-bold text-blue-600">Cleaning Tracker</span>
+    <span class="flex items-center gap-2">
+      <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="w-6 h-6">
+      <span class="font-bold text-blue-600">Cleaning Tracker</span>
+    </span>
     <span class="text-xs text-gray-400" x-text="config.business_name"></span>
   </header>
 
