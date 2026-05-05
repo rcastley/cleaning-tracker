@@ -1,56 +1,107 @@
-# Cleaning Job Time Tracker
+# Cleaning Tracker
 
-A simple Streamlit application to track hours worked for cleaning jobs, generate monthly reports, and manage tax year summaries.
+A mobile-first Flask web app to track hours worked on cleaning jobs, log expenses and mileage, generate monthly reports and printable invoices, and produce tax year summaries (UK HMRC mileage allowance included).
+
+## Stack
+
+- **Backend**: Flask + Gunicorn, JSON file storage (no database)
+- **Frontend**: Alpine.js + Tailwind CSS (precompiled), inline SVG icons, no build step at runtime
+- **Compression**: gzip via `flask-compress`; static assets cached for 1 hour
 
 ## Features
 
-- **Multiple Clients**: Add and manage multiple clients, select client when logging entries
-- **Log Entries**: Record date, start time, and end time for each cleaning session
-- **Log Expenses**: Track expenses for cleaning products (receipts attached to printed invoice)
-- **Monthly Reports**: View hours, expenses and amounts by month, filtered by client
-- **Printable Invoices**: Generate professional A4 invoices per client that open in a new tab for printing
-- **Tax Year Summary**: Track earnings and expenses across the full tax year with monthly breakdown
-- **View All Entries**: Browse and delete individual entries and expenses
-- **Settings**: Configure hourly rate, currency, tax year start month, and invoice details
+- **Multiple clients** with default round-trip mileage per client
+- **Log work** — date, start/end time, miles; auto-computes hours and amount
+- **Log expenses** — cleaning supplies etc., grouped by client
+- **Monthly reports** — hours, labour, expenses, mileage by client and month
+- **Tax year summary** — full breakdown with HMRC-rate mileage allowance (45p/25p)
+- **Printable invoices** — open as a standalone HTML page, print-ready A4
+- **History** — browse and delete individual entries/expenses
+- **Settings** — hourly rate, currency, tax year start, business details, payment info, client management
 
 ## Installation
 
-1. Make sure you have Python 3.8+ installed
+Requires Python 3.10+ and Node.js (for the one-time CSS build).
 
-2. Install dependencies:
+```bash
+# 1. Create a virtualenv and install Python deps
+uv venv .venv               # or: python -m venv .venv
+uv pip install -r requirements.txt   # or: .venv/bin/pip install -r requirements.txt
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+# 2. Build the Tailwind stylesheet (committed; only needed when classes change)
+npm install
+npm run build:css
+```
 
-3. Run the application:
+## Running
 
-   ```bash
-   streamlit run app.py
-   ```
+```bash
+./start.sh           # start gunicorn in the background on port 5001
+./start.sh status    # check if it's running
+./start.sh log       # tail the log
+./start.sh stop      # stop it
+```
 
-4. Open your browser to `http://localhost:8501`
+Then open `http://localhost:5001`.
 
-## Data Storage
+For development with hot CSS reloading:
 
-The app stores data in JSON files in a `data` folder:
+```bash
+npm run watch:css     # in one terminal
+.venv/bin/python webapp.py    # in another (Flask dev server on :5001)
+```
 
-- `entries.json` - All your logged work entries
-- `expenses.json` - All your logged expenses
-- `clients.json` - Your client list
-- `config.json` - Your settings (hourly rate, currency, invoice details, etc.)
+## Data storage
 
-These files are created automatically when you first save data.
+JSON files in `./data/` (created on first save):
 
-## Backup
+- `entries.json` — work entries
+- `expenses.json` — expenses
+- `clients.json` — client list
+- `config.json` — app settings
 
-To backup your data, simply copy the `data` folder. To restore, replace the `data` folder with your backup.
+The `data/*.json` files are gitignored. Use `./backup.sh` to snapshot the `data/` folder into `./backups/`.
 
 ## Configuration
 
-Default settings (can be changed in the Settings page):
+Configurable from the in-app **Settings** tab. Defaults:
 
 - Hourly rate: £15.00
 - Currency: £ (GBP)
-- Tax year starts: April (UK tax year)
+- Tax year starts: April (UK)
 - Payment terms: 14 days
+
+## Project layout
+
+```
+webapp.py              Flask routes (page + JSON API)
+helpers.py             Business logic + invoice template rendering
+templates/
+  index.html           Single-page app shell
+  invoice.html         Printable invoice template
+static/
+  tailwind.css         Built stylesheet (commit; rebuild via npm run build:css)
+  app.js               Alpine app code + icon SVGs
+  favicon.svg          App icon
+  vendor/alpine.min.js Alpine.js 3.14.9 (self-hosted)
+  src/input.css        Tailwind entry point
+data/                  JSON data files (gitignored)
+tailwind.config.js     Tailwind content-scanning config
+package.json           CSS build scripts
+requirements.txt       Python deps
+start.sh               Gunicorn process manager
+backup.sh              Data backup script
+```
+
+## API
+
+JSON endpoints (all return `application/json`):
+
+- `GET /api/bootstrap` — config + clients + entries + expenses in one call (used on initial page load)
+- `GET|POST|DELETE /api/entries` (`?client_id=…`) and `DELETE /api/entries/<id>`
+- `GET|POST|DELETE /api/expenses` and `DELETE /api/expenses/<id>`
+- `GET|POST|PUT|DELETE /api/clients` and `<id>` variants
+- `GET|PUT /api/config`
+- `GET /api/reports/monthly?client_id=&year=&month=`
+- `GET /api/reports/taxyear?client_id=&tax_year=`
+- `GET /invoice?client_id=&year=&month=` — full HTML invoice page
