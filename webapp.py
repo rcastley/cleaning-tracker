@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from flask import Flask, jsonify, request, render_template, abort
+from flask_compress import Compress
 
 from helpers import (
     ENTRIES_FILE, EXPENSES_FILE, CONFIG_FILE, CLIENTS_FILE,
@@ -14,6 +15,18 @@ from helpers import (
 )
 
 app = Flask(__name__)
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 3600  # 1 hour cache for /static
+Compress(app)
+
+
+@app.after_request
+def _enable_static_compression(response):
+    # flask-compress skips direct_passthrough responses (used by send_from_directory).
+    # Force the body to materialise so the next after_request (flask-compress) can gzip it.
+    if response.direct_passthrough and response.mimetype in ("text/css", "text/javascript"):
+        response.direct_passthrough = False
+        response.set_data(response.get_data())
+    return response
 
 
 def _filter_by_client(items, client_id):
@@ -30,6 +43,17 @@ def _filter_by_client(items, client_id):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/bootstrap")
+def bootstrap():
+    """Single-shot endpoint that returns everything needed for initial UI render."""
+    return jsonify({
+        "config": load_config(),
+        "clients": load_json(CLIENTS_FILE, list(DEFAULT_CLIENTS)),
+        "entries": load_json(ENTRIES_FILE, []),
+        "expenses": load_json(EXPENSES_FILE, []),
+    })
 
 
 @app.route("/invoice")
