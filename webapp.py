@@ -1,6 +1,8 @@
 """Flask web app — mobile-first UI for Cleaning Tracker."""
 
 from datetime import datetime
+import math
+import re
 from flask import Flask, jsonify, request, render_template, abort
 from flask_compress import Compress
 
@@ -92,6 +94,70 @@ def invoice():
 # ---------------------------------------------------------------------------
 # Entries API
 # ---------------------------------------------------------------------------
+
+def _validate_edit(data, work=False):
+    """Validate editable fields without accepting derived values from the browser."""
+    errors = {}
+    clients = load_json(CLIENTS_FILE, list(DEFAULT_CLIENTS))
+    if not any(c['id'] == data.get('client_id') for c in clients):
+        errors['client_id'] = 'Select an existing client.'
+    try:
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', str(data.get('date', ''))):
+            raise ValueError
+        datetime.strptime(data['date'], '%Y-%m-%d')
+    except (ValueError, TypeError):
+        errors['date'] = 'Enter a valid date.'
+    numeric = 'miles' if work else 'amount'
+    try:
+        value = float(data.get(numeric, ''))
+        if isinstance(data.get(numeric), bool) or not math.isfinite(value) or value < 0 or (not work and round(value, 2) <= 0):
+            raise ValueError
+        data[numeric] = value
+    except (ValueError, TypeError, OverflowError):
+        errors[numeric] = 'Enter miles of zero or more.' if work else 'Enter an amount greater than zero.'
+    if work:
+        for field in ('start_time', 'end_time'):
+            if not re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d', str(data.get(field, ''))):
+                errors[field] = 'Enter a valid time.'
+        if not errors.get('start_time') and not errors.get('end_time') and data['start_time'] == data['end_time']:
+            errors['end_time'] = 'End time must differ from start time.'
+    elif not isinstance(data.get('description'), str):
+        errors['description'] = 'Enter a description (or leave it blank).'
+    return errors
+
+
+@app.route('/api/entries/<entry_id>', methods=['PUT'])
+def update_entry(entry_id):
+    return _update_record(ENTRIES_FILE, entry_id, work=True)
+
+
+@app.route('/api/expenses/<expense_id>', methods=['PUT'])
+def update_expense(expense_id):
+    return _update_record(EXPENSES_FILE, expense_id)
+
+
+def _update_record(path, record_id, work=False):
+    records = load_json(path, [])
+    record = next((r for r in records if r['id'] == record_id), None)
+    if record is None:
+        return jsonify(error='This record no longer exists.'), 404
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error='Send a JSON object.'), 400
+    errors = _validate_edit(data, work)
+    if errors:
+        return jsonify(error='Please check the highlighted fields.', errors=errors), 400
+    fields = ('client_id', 'date', 'start_time', 'end_time', 'miles') if work else ('client_id', 'date', 'amount', 'description')
+    updated = {**record, **{field: data[field] for field in fields}}
+    if work:
+        hours = calculate_hours(updated['start_time'], updated['end_time'])
+        updated['hours'] = round(hours, 2)
+        updated['amount'] = round(hours * record['hourly_rate'], 2)
+    else:
+        updated['amount'] = round(updated['amount'], 2)
+    records[records.index(record)] = updated
+    save_json(path, records)
+    return jsonify(updated)
 
 @app.route("/api/entries", methods=["GET"])
 def list_entries():

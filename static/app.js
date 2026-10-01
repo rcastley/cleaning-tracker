@@ -45,6 +45,57 @@ function app() {
     taxYearData: { available_tax_years: [], sessions: 0, total_hours: 0, total_hours_fmt: '0h 0m', total_labour: 0, total_expenses: 0, total_amount: 0, total_miles: 0, mileage_allowance: 0, breakdown: [], currency: '£' },
 
     historyMode: 'work',
+    editor: { open: false, kind: 'work', draft: {}, original: '', errors: {}, error: '', saving: false },
+
+    openEditor(kind, record, trigger) {
+      this.editTrigger = trigger;
+      this.editor = { open: true, kind, draft: { ...record }, original: JSON.stringify(record), errors: {}, error: '', saving: false };
+      this.$nextTick(() => this.$refs.editClient.focus());
+    },
+
+    closeEditor() {
+      if (this.editor.saving) return;
+      if (JSON.stringify(this.editor.draft) !== this.editor.original && !window.confirm('Discard your unsaved changes?')) return;
+      this.finishEditing();
+    },
+
+    finishEditing() {
+      this.editor.open = false;
+      this.$nextTick(() => this.editTrigger?.focus({ preventScroll: true }));
+    },
+
+    editorKeydown(event) {
+      if (event.key === 'Escape') { event.preventDefault(); this.closeEditor(); }
+      if (event.key !== 'Tab') return;
+      const items = [...this.$refs.editDialog.querySelectorAll('button, input, select, textarea')]
+        .filter(el => !el.disabled && el.getClientRects().length);
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    },
+
+    async saveEdit() {
+      if (this.editor.saving) return;
+      this.editor.saving = true;
+      this.editor.errors = {};
+      this.editor.error = '';
+      const work = this.editor.kind === 'work';
+      try {
+        const updated = await this.api('/api/' + (work ? 'entries' : 'expenses') + '/' + encodeURIComponent(this.editor.draft.id), 'PUT', this.editor.draft);
+        const records = work ? this.entries : this.expenses;
+        const index = records.findIndex(r => r.id === updated.id);
+        if (index >= 0) records.splice(index, 1, updated);
+        this.finishEditing();
+        this.showToast(work ? 'Entry updated' : 'Expense updated', 'success');
+        // Reports fetch current data whenever opened; invoices are rendered from saved records.
+      } catch (error) {
+        this.editor.errors = error.fields || {};
+        this.editor.error = error.message || 'Unable to save. Please try again.';
+        this.$nextTick(() => this.$refs.editDialog.querySelector('[aria-invalid="true"]')?.focus());
+      } finally {
+        this.editor.saving = false;
+      }
+    },
 
     newClientName: '',
     newClientAddress: '',
@@ -297,7 +348,12 @@ function app() {
         opts.body = JSON.stringify(body);
       }
       const res = await fetch(url, opts);
-      if (!res.ok) throw new Error(res.statusText);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const error = new Error(data.error || 'Unable to complete the request. Please try again.');
+        error.fields = data.errors || {};
+        throw error;
+      }
       return res.json();
     },
   };

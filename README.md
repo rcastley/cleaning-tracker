@@ -16,7 +16,7 @@ A mobile-first Flask web app to track hours worked on cleaning jobs, log expense
 - **Monthly reports** — hours, labour, expenses, mileage by client and month
 - **Tax year summary** — full breakdown with HMRC-rate mileage allowance (45p/25p)
 - **Printable invoices** — open as a standalone HTML page, print-ready A4
-- **History** — browse and delete individual entries/expenses
+- **History** — browse, edit and delete individual entries/expenses
 - **Settings** — hourly rate, currency, tax year start, business details, payment info, client management
 
 ## Installation
@@ -98,10 +98,25 @@ backup.sh              Data backup script
 JSON endpoints (all return `application/json`):
 
 - `GET /api/bootstrap` — config + clients + entries + expenses in one call (used on initial page load)
-- `GET|POST|DELETE /api/entries` (`?client_id=…`) and `DELETE /api/entries/<id>`
-- `GET|POST|DELETE /api/expenses` and `DELETE /api/expenses/<id>`
+- `GET|POST|DELETE /api/entries` (`?client_id=…`) and `PUT|DELETE /api/entries/<id>`
+- `GET|POST|DELETE /api/expenses` and `PUT|DELETE /api/expenses/<id>`
 - `GET|POST|PUT|DELETE /api/clients` and `<id>` variants
 - `GET|PUT /api/config`
 - `GET /api/reports/monthly?client_id=&year=&month=`
 - `GET /api/reports/taxyear?client_id=&tax_year=`
 - `GET /invoice?client_id=&year=&month=` — full HTML invoice page
+
+### Editing records
+
+History provides an Edit action for work and expenses. Work edits retain the original
+hourly rate and recalculate hours and earnings. Earlier end times indicate overnight
+work. Cancel or Escape asks before discarding changed drafts; failed saves retain them.
+Reports and newly generated invoices use the saved corrections.
+
+Update requests require client_id and date, plus start_time, end_time and miles for
+work, or amount and description for expenses. IDs and work rates cannot be changed.
+Validation failures return HTTP 400 with `error` and field-keyed `errors`; missing
+records return HTTP 404.
+
+Run edit regression tests with `.venv/bin/python -m unittest discover -s tests`
+and `node tests/test_editor.cjs`.
