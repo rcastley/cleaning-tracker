@@ -38,6 +38,25 @@ def _filter_by_client(items, client_id):
     return [e for e in items if e.get("client_id") == client_id]
 
 
+def _requested_date_range():
+    dates = []
+    for field in ("start_date", "end_date"):
+        value = request.args.get(field, "")
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            raise ValueError("Enter a valid start and end date (YYYY-MM-DD).")
+        try:
+            dates.append(datetime.strptime(value, "%Y-%m-%d").date())
+        except ValueError:
+            raise ValueError("Enter a valid start and end date (YYYY-MM-DD).") from None
+    if dates[0] > dates[1]:
+        raise ValueError("End date must be on or after start date.")
+    return dates
+
+
+def _filter_by_dates(items, start, end):
+    return [e for e in items if start <= datetime.fromisoformat(e["date"]).date() <= end]
+
+
 # ---------------------------------------------------------------------------
 # Page routes
 # ---------------------------------------------------------------------------
@@ -62,10 +81,21 @@ def bootstrap():
 def invoice():
     """Render an invoice as a standalone HTML page."""
     client_id = request.args.get("client_id")
+    start = end = None
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
-    if not client_id or not year or not month:
-        abort(400, "client_id, year, and month are required")
+    if not client_id:
+        abort(400, "client_id is required")
+    if "start_date" in request.args or "end_date" in request.args:
+        try:
+            start, end = _requested_date_range()
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+    else:
+        try:
+            datetime(year, month, 1)
+        except (ValueError, TypeError):
+            abort(400, "A valid year and month are required")
 
     config = load_config()
     clients = load_json(CLIENTS_FILE, list(DEFAULT_CLIENTS))
@@ -76,18 +106,23 @@ def invoice():
     entries = _filter_by_client(entries, client_id)
     expenses = _filter_by_client(expenses, client_id)
 
-    month_entries = [
-        e for e in entries
-        if datetime.fromisoformat(e["date"]).year == year
-        and datetime.fromisoformat(e["date"]).month == month
-    ]
-    month_expenses = [
-        e for e in expenses
-        if datetime.fromisoformat(e["date"]).year == year
-        and datetime.fromisoformat(e["date"]).month == month
-    ]
+    if start is not None:
+        month_entries = _filter_by_dates(entries, start, end)
+        month_expenses = _filter_by_dates(expenses, start, end)
+    else:
+        month_entries = [
+            e for e in entries
+            if datetime.fromisoformat(e["date"]).year == year
+            and datetime.fromisoformat(e["date"]).month == month
+        ]
+        month_expenses = [
+            e for e in expenses
+            if datetime.fromisoformat(e["date"]).year == year
+            and datetime.fromisoformat(e["date"]).month == month
+        ]
 
-    html = generate_invoice_html(month_entries, month_expenses, year, month, config, client)
+    html = generate_invoice_html(month_entries, month_expenses, year, month, config, client,
+                                 start_date=start, end_date=end)
     return html
 
 
@@ -365,23 +400,43 @@ def monthly_report():
         month_entries = []
         month_expenses = []
 
-    total_hours = sum(e["hours"] for e in month_entries)
-    total_labour = sum(e["amount"] for e in month_entries)
-    total_expenses = sum(e["amount"] for e in month_expenses)
-    total_miles = sum(e.get("miles", 0) for e in month_entries)
-
     return jsonify({
+        **_report_totals(month_entries, month_expenses, config),
         "available_months": [{"year": y, "month": m, "label": datetime(y, m, 1).strftime("%B %Y")} for y, m in available_months],
-        "sessions": len(month_entries),
+    })
+
+
+def _report_totals(entries, expenses, config):
+    total_hours = sum(e["hours"] for e in entries)
+    total_labour = sum(e["amount"] for e in entries)
+    total_expenses = sum(e["amount"] for e in expenses)
+    return {
+        "sessions": len(entries),
         "total_hours": round(total_hours, 2),
         "total_hours_fmt": format_hours(total_hours),
         "total_labour": round(total_labour, 2),
         "total_expenses": round(total_expenses, 2),
         "total_amount": round(total_labour + total_expenses, 2),
-        "total_miles": round(total_miles, 1),
-        "entries": sorted(month_entries, key=lambda x: x["date"]),
-        "expenses": sorted(month_expenses, key=lambda x: x["date"]),
+        "total_miles": round(sum(e.get("miles", 0) for e in entries), 1),
+        "entries": sorted(entries, key=lambda x: x["date"]),
+        "expenses": sorted(expenses, key=lambda x: x["date"]),
         "currency": config["currency_symbol"],
+    }
+
+
+@app.route("/api/reports/range")
+def date_range_report():
+    try:
+        start, end = _requested_date_range()
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    client_id = request.args.get("client_id")
+    entries = _filter_by_dates(_filter_by_client(load_json(ENTRIES_FILE, []), client_id), start, end)
+    expenses = _filter_by_dates(_filter_by_client(load_json(EXPENSES_FILE, []), client_id), start, end)
+    return jsonify({
+        **_report_totals(entries, expenses, load_config()),
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
     })
 
 

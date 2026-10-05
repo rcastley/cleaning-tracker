@@ -41,6 +41,16 @@ function app() {
     reportClientId: '',
     selectedMonth: '',
     selectedTaxYear: '',
+    rangeStart: today.slice(0, 8) + '01',
+    rangeEnd: today,
+    rangeData: null,
+    rangeLoadedKey: '',
+    rangeRequest: 0,
+    rangeLoading: false,
+    rangeError: '',
+    get rangeKey() { return JSON.stringify([this.reportClientId, this.rangeStart, this.rangeEnd]); },
+    get rangeReady() { return !!this.rangeData && this.rangeLoadedKey === this.rangeKey && !this.rangeLoading && !this.rangeError; },
+    get periodData() { return this.reportMode === 'range' && this.rangeData ? this.rangeData : this.monthlyData; },
     monthlyData: { available_months: [], sessions: 0, total_hours: 0, total_hours_fmt: '0h 0m', total_labour: 0, total_expenses: 0, total_amount: 0, total_miles: 0, entries: [], expenses: [], currency: '£' },
     taxYearData: { available_tax_years: [], sessions: 0, total_hours: 0, total_hours_fmt: '0h 0m', total_labour: 0, total_expenses: 0, total_amount: 0, total_miles: 0, mileage_allowance: 0, breakdown: [], currency: '£' },
 
@@ -143,8 +153,7 @@ function app() {
 
     onTabSwitch(id) {
       if (id === 'reports') {
-        if (this.reportMode === 'monthly') this.loadMonthly();
-        else this.loadTaxYear();
+        this.loadReport();
       } else if (id === 'history') {
         this.loadEntries();
         this.loadExpenses();
@@ -192,6 +201,43 @@ function app() {
       this.saving = false;
     },
 
+    loadReport() {
+      if (this.reportMode === 'range') return this.loadRange();
+      if (this.reportMode === 'monthly') return this.loadMonthly();
+      return this.loadTaxYear();
+    },
+
+    async loadRange() {
+      const request = ++this.rangeRequest;
+      const key = this.rangeKey;
+      this.rangeError = '';
+      this.rangeLoadedKey = '';
+      this.rangeLoading = false;
+      if (!this.rangeStart || !this.rangeEnd) {
+        this.rangeError = 'Select a start and end date.';
+        return;
+      }
+      if (this.rangeStart > this.rangeEnd) {
+        this.rangeError = 'End date must be on or after start date.';
+        return;
+      }
+      this.rangeLoading = true;
+      const params = new URLSearchParams({ start_date: this.rangeStart, end_date: this.rangeEnd });
+      if (this.reportClientId) params.set('client_id', this.reportClientId);
+      try {
+        const data = await this.api('/api/reports/range?' + params);
+        if (request !== this.rangeRequest || key !== this.rangeKey) return;
+        this.rangeData = data;
+        this.rangeLoadedKey = key;
+      } catch (error) {
+        if (request === this.rangeRequest && key === this.rangeKey) {
+          this.rangeError = error.message || 'Unable to load report. Please try again.';
+        }
+      } finally {
+        if (request === this.rangeRequest) this.rangeLoading = false;
+      }
+    },
+
     async loadMonthly() {
       let url = '/api/reports/monthly?';
       if (this.reportClientId) url += 'client_id=' + this.reportClientId + '&';
@@ -234,9 +280,19 @@ function app() {
     },
 
     openInvoice() {
-      if (!this.selectedMonth || !this.reportClientId) return;
-      const [y, m] = this.selectedMonth.split('-');
-      window.open('/invoice?client_id=' + this.reportClientId + '&year=' + y + '&month=' + m, '_blank');
+      if (!this.reportClientId) return;
+      const params = new URLSearchParams({ client_id: this.reportClientId });
+      if (this.reportMode === 'range') {
+        if (!this.rangeReady) return;
+        params.set('start_date', this.rangeStart);
+        params.set('end_date', this.rangeEnd);
+      } else {
+        if (!this.selectedMonth) return;
+        const [y, m] = this.selectedMonth.split('-');
+        params.set('year', y);
+        params.set('month', m);
+      }
+      window.open('/invoice?' + params, '_blank');
     },
 
     deleteEntry(id) {

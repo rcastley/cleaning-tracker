@@ -1,6 +1,6 @@
 # Cleaning Tracker
 
-A mobile-first Flask web app to track hours worked on cleaning jobs, log expenses and mileage, generate monthly reports and printable invoices, and produce tax year summaries (UK HMRC mileage allowance included).
+A mobile-first Flask web app to track hours worked on cleaning jobs, log expenses and mileage, generate monthly and custom date range reports and printable invoices, and produce tax year summaries (UK HMRC mileage allowance included).
 
 ## Stack
 
@@ -13,7 +13,7 @@ A mobile-first Flask web app to track hours worked on cleaning jobs, log expense
 - **Multiple clients** with default round-trip mileage per client
 - **Log work** — date, start/end time, miles; auto-computes hours and amount
 - **Log expenses** — cleaning supplies etc., grouped by client
-- **Monthly reports** — hours, labour, expenses, mileage by client and month
+- **Reports** — hours, labour, expenses and mileage by client, month or custom date range (both dates included)
 - **Tax year summary** — full breakdown with HMRC-rate mileage allowance (45p/25p)
 - **Printable invoices** — open as a standalone HTML page, print-ready A4
 - **History** — browse, edit and delete individual entries/expenses
@@ -103,8 +103,10 @@ JSON endpoints (all return `application/json`):
 - `GET|POST|PUT|DELETE /api/clients` and `<id>` variants
 - `GET|PUT /api/config`
 - `GET /api/reports/monthly?client_id=&year=&month=`
+- `GET /api/reports/range?client_id=&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`
 - `GET /api/reports/taxyear?client_id=&tax_year=`
 - `GET /invoice?client_id=&year=&month=` — full HTML invoice page
+- `GET /invoice?client_id=&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` — custom period invoice
 
 ### Editing records
 
@@ -120,3 +122,15 @@ records return HTTP 404.
 
 Run edit regression tests with `.venv/bin/python -m unittest discover -s tests`
 and `node tests/test_editor.cjs`.
+
+### Custom date reports
+
+In **Reports → Custom dates**, select the start and end dates. Reports update when
+those dates or the client change; **Update report** refreshes or retries the request.
+Both dates are included, and ranges can span months or years. Select a client and
+choose **View Invoice** to print or save as PDF using your browser. Expense-only
+periods can also be invoiced. Custom invoice references use
+`PREFIX-YYYYMMDD-YYYYMMDD`; monthly invoice references are unchanged.
+
+Run report checks with `.venv/bin/python -m unittest discover -s tests`
+and `node tests/test_reports.cjs`.

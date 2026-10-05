@@ -157,7 +157,7 @@ def calculate_hmrc_mileage_allowance(total_miles):
 # Invoice
 # ---------------------------------------------------------------------------
 
-def generate_invoice_html(month_entries, month_expenses, selected_year, selected_month, config, client):
+def generate_invoice_html(month_entries, month_expenses, selected_year, selected_month, config, client, *, start_date=None, end_date=None):
     """Generate a printable HTML invoice optimized for single A4 page."""
     total_hours = sum(e["hours"] for e in month_entries)
     total_labour = sum(e["amount"] for e in month_entries)
@@ -195,10 +195,12 @@ def generate_invoice_html(month_entries, month_expenses, selected_year, selected
     return template.render(
         config=Config(config),
         client=Config(client),
-        invoice_number=generate_invoice_number(selected_year, selected_month, config),
+        invoice_number=(f"{config['invoice_prefix']}-{start_date:%Y%m%d}-{end_date:%Y%m%d}"
+                        if start_date else generate_invoice_number(selected_year, selected_month, config)),
         invoice_date=datetime.now().strftime("%d/%m/%Y"),
         due_date=(datetime.now() + timedelta(days=config["payment_terms"])).strftime("%d/%m/%Y"),
-        month_name=datetime(selected_year, selected_month, 1).strftime("%B %Y"),
+        period_label=(f"{start_date:%d/%m/%Y} – {end_date:%d/%m/%Y}"
+                      if start_date else datetime(selected_year, selected_month, 1).strftime("%B %Y")),
         currency=currency,
         entries=entries_data,
         expenses=expenses_data,
