@@ -318,31 +318,53 @@
     <section x-show="tab === 'history'">
       <!-- Work / Expenses toggle -->
       <div class="segmented mb-4">
-        <button @click="historyMode = 'work'; historyLimit = 20" :aria-pressed="historyMode === 'work'" :class="historyMode === 'work' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
+        <button @click="historyMode = 'work'; historyPage = 1" :aria-pressed="historyMode === 'work'" :class="historyMode === 'work' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
           class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Work</button>
-        <button @click="historyMode = 'expenses'; historyLimit = 20" :aria-pressed="historyMode === 'expenses'" :class="historyMode === 'expenses' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
+        <button @click="historyMode = 'expenses'; historyPage = 1" :aria-pressed="historyMode === 'expenses'" :class="historyMode === 'expenses' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
           class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Expenses</button>
       </div>
 
       <div class="history-filters">
-        <label for="history-search" class="field-label">Find a record</label>
-        <input id="history-search" type="search" x-model="historySearch" @input="historyLimit = 20" placeholder="Search client, date, amount or description">
+        <div x-show="!historySearching" class="mb-4">
+          <div class="flex justify-between items-center gap-2 mb-1">
+            <label for="history-month" class="field-label">Month</label>
+            <button class="text-sm font-semibold text-blue-700 px-2" @click="currentHistoryMonth()">This month</button>
+          </div>
+          <div class="history-month-controls">
+            <button @click="shiftHistoryMonth(-1)" :disabled="historyMonth === '0001-01'" class="secondary-button" aria-label="Previous month" title="Previous month"><span aria-hidden="true">&#8592;</span></button>
+            <input id="history-month" type="month" :value="historyMonth" @change="setHistoryMonth($event.target.value); $event.target.value = historyMonth" min="0001-01" max="9999-12" required>
+            <button @click="shiftHistoryMonth(1)" :disabled="historyMonth === '9999-12'" class="secondary-button" aria-label="Next month" title="Next month"><span aria-hidden="true">&#8594;</span></button>
+          </div>
+        </div>
+        <label for="history-search" class="field-label">Search all history</label>
+        <input id="history-search" type="search" x-model="historySearch" @input="historyPage = 1" placeholder="Client, date, amount or description" aria-describedby="history-search-scope">
+        <p id="history-search-scope" class="text-sm text-gray-500 mt-1">Search covers every month and year for the selected client and entry type.</p>
+        <button x-show="historySearching" @click="historySearch = ''; historyPage = 1" class="secondary-button mt-2" x-text="'Back to ' + historyMonthLabel"></button>
         <div x-show="clients.length > 1" class="mt-3">
           <label for="history-client" class="field-label">Client</label>
-          <select id="history-client" x-model="historyClientId" @change="historyLimit = 20"><option value="">All clients</option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+          <select id="history-client" x-model="historyClientId" @change="historyPage = 1"><option value="">All clients</option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
         </div>
       </div>
       <p x-show="historyLoading" role="status" class="notice">Refreshing history…</p>
       <div x-show="historyError" role="alert" class="notice notice-error"><p x-text="historyError"></p><button class="secondary-button mt-2" @click="loadHistory()">Try again</button></div>
-      <div class="flex justify-between items-center gap-3 mb-3 text-sm text-gray-600">
-        <span x-text="filteredHistory.length + (filteredHistory.length === 1 ? ' record' : ' records')"></span>
-        <strong x-text="config.currency_symbol + historyTotal.toFixed(2)"></strong>
+      <div x-ref="historyResults" tabindex="-1" class="history-results mb-3">
+        <h2 class="font-semibold text-gray-800" x-text="historySearching ? 'Search results · all dates' : historyMonthLabel"></h2>
+        <div class="flex justify-between items-center gap-3 mt-1 text-sm text-gray-600" role="status" aria-live="polite">
+          <span x-text="historyResultLabel"></span>
+          <span x-text="'Total: ' + config.currency_symbol + historyTotal.toFixed(2)"></span>
+        </div>
       </div>
+      <nav x-show="historyPageCount > 1" aria-label="History pages" class="history-pagination mb-3">
+        <button @click="changeHistoryPage(-1)" :disabled="currentHistoryPage === 1" class="secondary-button">Previous</button>
+        <span class="text-sm text-gray-600" x-text="currentHistoryPage + ' / ' + historyPageCount"></span>
+        <button @click="changeHistoryPage(1)" :disabled="currentHistoryPage === historyPageCount" class="secondary-button">Next</button>
+      </nav>
       <div x-show="!filteredHistory.length && !historyLoading && !historyError" class="empty-state">
-        <h2 x-text="historySearch || historyClientId ? 'No matching records' : 'Nothing here yet'"></h2>
-        <p x-text="historySearch || historyClientId ? 'Try another search or choose a different client.' : 'Add your first entry to start building your history.'"></p>
-        <button x-show="historySearch || historyClientId" @click="historySearch = ''; historyClientId = ''; historyLimit = 20" class="secondary-button mt-3">Clear filters</button>
-        <button x-show="!historySearch && !historyClientId" @click="logMode = historyMode === 'work' ? 'work' : 'expense'; tab = 'log'; onTabSwitch('log')" class="primary-button mt-3">Add an entry</button>
+        <h2 x-text="historySearching ? 'No matching records' : 'No records this month'"></h2>
+        <p x-text="historySearching ? 'Try another search or choose a different client.' : 'Choose another month or add an entry.'"></p>
+        <button x-show="!historySearching && latestHistoryMonth && latestHistoryMonth !== historyMonth" @click="setHistoryMonth(latestHistoryMonth)" class="secondary-button mt-3">Go to latest records</button>
+        <button x-show="historySearching || historyClientId" @click="historySearch = ''; historyClientId = ''; historyPage = 1" class="secondary-button mt-3">Clear filters</button>
+        <button x-show="!historySearching" @click="logMode = historyMode === 'work' ? 'work' : 'expense'; tab = 'log'; onTabSwitch('log')" class="primary-button mt-3">Add an entry</button>
       </div>
       <div class="space-y-3">
         <template x-for="e in visibleHistory" :key="historyMode + e.id">
@@ -361,7 +383,11 @@
           </article>
         </template>
       </div>
-      <button x-show="filteredHistory.length > historyLimit" @click="historyLimit += 20" class="secondary-button w-full mt-4" x-text="'Show more (' + (filteredHistory.length - historyLimit) + ' remaining)'"></button>
+      <nav x-show="historyPageCount > 1" aria-label="History pages at end of results" class="history-pagination mt-4">
+        <button @click="changeHistoryPage(-1)" :disabled="currentHistoryPage === 1" class="secondary-button">Previous</button>
+        <span class="text-sm text-gray-600" x-text="currentHistoryPage + ' / ' + historyPageCount"></span>
+        <button @click="changeHistoryPage(1)" :disabled="currentHistoryPage === historyPageCount" class="secondary-button">Next</button>
+      </nav>
     </section>
 
     <!-- =========== SETTINGS TAB =========== -->

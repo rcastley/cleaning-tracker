@@ -72,3 +72,8 @@ main { padding-bottom: 2rem; }
   .editor-overlay > section { border-radius: 20px 20px 0 0; max-height: 92dvh; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+
+.history-month-controls { display: grid; grid-template-columns: 48px minmax(0,1fr) 48px; gap: .5rem; }
+.history-month-controls button { padding: .5rem; font-size: 1.25rem; }
+.history-pagination { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.history-results { scroll-margin-top: calc(68px + env(safe-area-inset-top)); }

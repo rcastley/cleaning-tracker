@@ -36,7 +36,9 @@ function app() {
     historyError: '',
     historySearch: '',
     historyClientId: '',
-    historyLimit: 20,
+    historyMonth: today.slice(0, 7),
+    historyPage: 1,
+    historyPageSize: 10,
     reportLoading: false,
     reportError: '',
     reportRequest: 0,
@@ -45,15 +47,54 @@ function app() {
 
     get pageTitle() { return { log: 'Add an entry', reports: 'Reports & invoices', history: 'Your history', settings: 'Settings' }[this.tab]; },
     get pageDescription() { return { log: 'Keep your hours and expenses up to date.', reports: 'Choose a period. Check your totals. Create an invoice.', history: 'Find, review and update your saved records.', settings: 'Manage your business, clients and payment details.' }[this.tab]; },
-    get filteredHistory() {
+    get historySearching() { return !!this.historySearch.trim(); },
+    get historyClientRecords() {
       const records = this.historyMode === 'work' ? this.sortedEntries : this.sortedExpenses;
+      return records.filter(e => !this.historyClientId || e.client_id === this.historyClientId);
+    },
+    get latestHistoryMonth() { return this.historyClientRecords[0]?.date.slice(0, 7) || ''; },
+    get historyMonthLabel() {
+      return new Date(this.historyMonth + '-01T12:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    },
+    get filteredHistory() {
       const query = this.historySearch.trim().toLowerCase();
-      return records.filter(e => (!this.historyClientId || e.client_id === this.historyClientId) &&
-        (!query || [this.clientName(e.client_id), e.date, this.fullDate(e.date), e.description || '', String(e.amount)]
-          .join(' ').toLowerCase().includes(query)));
+      return this.historyClientRecords.filter(e => query
+        ? [this.clientName(e.client_id), e.date, this.fullDate(e.date), e.description || '', String(e.amount)]
+          .join(' ').toLowerCase().includes(query)
+        : e.date.slice(0, 7) === this.historyMonth);
     },
     get historyTotal() { return this.filteredHistory.reduce((total, e) => total + e.amount, 0); },
-    get visibleHistory() { return this.filteredHistory.slice(0, this.historyLimit); },
+    get historyPageCount() { return Math.max(1, Math.ceil(this.filteredHistory.length / this.historyPageSize)); },
+    get currentHistoryPage() { return Math.min(Math.max(1, this.historyPage), this.historyPageCount); },
+    get historyResultLabel() {
+      const count = this.filteredHistory.length;
+      if (!count) return '0 records';
+      const first = (this.currentHistoryPage - 1) * this.historyPageSize + 1;
+      return first + '–' + Math.min(first + this.historyPageSize - 1, count) + ' of ' + count + ' records';
+    },
+    get visibleHistory() {
+      const start = (this.currentHistoryPage - 1) * this.historyPageSize;
+      return this.filteredHistory.slice(start, start + this.historyPageSize);
+    },
+    setHistoryMonth(value) {
+      if (!/^(?!0000)\d{4}-(0[1-9]|1[0-2])$/.test(value)) return;
+      this.historyMonth = value;
+      this.historyPage = 1;
+    },
+    shiftHistoryMonth(direction) {
+      const [year, month] = this.historyMonth.split('-').map(Number);
+      const index = year * 12 + month - 1 + direction;
+      if (index < 12 || index >= 120000) return;
+      this.setHistoryMonth(String(Math.floor(index / 12)).padStart(4, '0') + '-' + String(index % 12 + 1).padStart(2, '0'));
+    },
+    currentHistoryMonth() { this.setHistoryMonth(localDate(new Date()).slice(0, 7)); },
+    changeHistoryPage(direction) {
+      this.historyPage = Math.min(Math.max(1, this.currentHistoryPage + direction), this.historyPageCount);
+      this.$nextTick(() => {
+        this.$refs.historyResults.scrollIntoView({ block: 'start' });
+        this.$refs.historyResults.focus({ preventScroll: true });
+      });
+    },
     get canInvoice() {
       return !!this.reportClientId && !this.reportLoading && !this.reportError &&
         (this.reportMode === 'range' ? this.rangeReady : !!this.selectedMonth) &&
@@ -95,6 +136,7 @@ function app() {
         const [entries, expenses] = await Promise.all([this.api('/api/entries'), this.api('/api/expenses')]);
         this.entries = entries;
         this.expenses = expenses;
+        this.historyPage = this.currentHistoryPage;
       } catch (error) { this.historyError = 'Unable to refresh history. Please try again.'; }
       finally { this.historyLoading = false; }
     },
@@ -102,7 +144,9 @@ function app() {
       this.historyMode = this.lastSaved.kind === 'work' ? 'work' : 'expenses';
       this.historyClientId = this.lastSaved.client_id;
       this.historySearch = '';
-      this.historyLimit = 20;
+      this.setHistoryMonth(this.lastSaved.date.slice(0, 7));
+      const index = this.filteredHistory.findIndex(e => e.id === this.lastSaved.id);
+      this.historyPage = Math.floor(Math.max(0, index) / this.historyPageSize) + 1;
       this.tab = 'history';
       this.onTabSwitch('history');
     },
@@ -176,6 +220,7 @@ function app() {
         const records = work ? this.entries : this.expenses;
         const index = records.findIndex(r => r.id === updated.id);
         if (index >= 0) records.splice(index, 1, updated);
+        this.historyPage = this.currentHistoryPage;
         this.finishEditing();
         this.showToast(work ? 'Entry updated' : 'Expense updated', 'success');
         // Reports fetch current data whenever opened; invoices are rendered from saved records.
@@ -417,6 +462,7 @@ function app() {
           await this.api('/api/entries/' + encodeURIComponent(id), 'DELETE');
           this.showToast('Entry deleted', 'success');
           this.entries = this.entries.filter(e => e.id !== id);
+          this.historyPage = this.currentHistoryPage;
         }
       };
     },
@@ -428,6 +474,7 @@ function app() {
           await this.api('/api/expenses/' + encodeURIComponent(id), 'DELETE');
           this.showToast('Expense deleted', 'success');
           this.expenses = this.expenses.filter(e => e.id !== id);
+          this.historyPage = this.currentHistoryPage;
         }
       };
     },

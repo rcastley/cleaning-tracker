@@ -12,7 +12,7 @@ vm.runInContext(readFileSync('static/app.js', 'utf8'), context);
   app.showToast = () => {};
   let focused = false;
   const trigger = { focus() { focused = true; } };
-  const work = { id: 'one', hourly_rate: 12, miles: 4, start_time: '09:00', end_time: '12:00' };
+  const work = { id: 'one', date: '2026-01-01', hourly_rate: 12, miles: 4, start_time: '09:00', end_time: '12:00' };
   app.entries = [work];
   app.openEditor('work', work, trigger);
   app.editor.draft.miles = '8';
@@ -48,7 +48,7 @@ vm.runInContext(readFileSync('static/app.js', 'utf8'), context);
   assert.equal(app.entries[0].hourly_rate, 12);
   assert.equal(app.editor.open, false);
 
-  const expense = { id: 'expense', amount: 5, description: 'Supplies' };
+  const expense = { id: 'expense', date: '2026-01-01', amount: 5, description: 'Supplies' };
   app.expenses = [expense];
   app.openEditor('expense', expense, trigger);
   app.editor.draft.amount = '3.49';

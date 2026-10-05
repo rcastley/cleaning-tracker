@@ -141,7 +141,10 @@ and `node tests/test_reports.cjs`.
   guidance, penny-precision expenses and a saved-entry confirmation. Failed saves
   retain the draft and repeated taps cannot submit a second request while saving.
 - **History** supports search by client, date, description or amount, a client
-  filter, matching totals and 20 records at a time. Cards show full dates and keep
+  filter, matching totals and 10 records per page. History opens on the current
+  month, with previous/next month controls and a month/year picker. Search covers
+  all dates; clearing it returns to the selected month. Empty months offer a
+  shortcut to the latest records for the selected client and entry type. Cards show full dates and keep
   edit/delete targets separate from the record details.
 - **Reports** offer this-week/this-month/last-month shortcuts, a compact totals
   panel, loading/retry states and a prominent invoice action with guidance.
