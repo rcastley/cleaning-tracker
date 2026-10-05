@@ -189,7 +189,17 @@
         </form>
 
         <div x-show="reportMode === 'monthly' || rangeReady">
-        <p x-show="reportMode === 'range'" class="text-sm text-gray-500 mb-4" x-text="'Period: ' + rangeStart + ' to ' + rangeEnd"></p>
+          <!-- Invoice button -->
+          <div x-show="reportClientId && (periodData.sessions > 0 || periodData.expenses.length > 0)" class="mb-4">
+            <button @click="openInvoice()"
+              class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] text-white font-semibold py-3 rounded-lg text-base transition-all">
+              View Invoice
+            </button>
+            <p class="text-xs text-gray-400 text-center mt-1">Opens in new tab for printing</p>
+          </div>
+          <p x-show="!reportClientId && (periodData.sessions > 0 || periodData.expenses.length > 0)" class="text-sm text-gray-400 text-center py-2">Select a specific client to generate an invoice.</p>
+
+          <p x-show="reportMode === 'range'" class="text-sm text-gray-500 mb-4" x-text="'Period: ' + rangeStart + ' to ' + rangeEnd"></p>
           <!-- Metrics -->
           <div class="grid grid-cols-2 gap-3 mb-4">
             <div class="bg-white rounded-lg shadow-sm p-3 text-center">
@@ -247,16 +257,6 @@
           </div>
 
           <p x-show="!periodData.sessions && !periodData.expenses.length" class="text-sm text-gray-500 text-center py-2">No work or expenses for this period.</p>
-
-          <!-- Invoice button -->
-          <div x-show="reportClientId && (periodData.sessions > 0 || periodData.expenses.length > 0)" class="mb-4">
-            <button @click="openInvoice()"
-              class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] text-white font-semibold py-3 rounded-lg text-base transition-all">
-              View Invoice
-            </button>
-            <p class="text-xs text-gray-400 text-center mt-1">Opens in new tab for printing</p>
-          </div>
-          <p x-show="!reportClientId && (periodData.sessions > 0 || periodData.expenses.length > 0)" class="text-sm text-gray-400 text-center py-2">Select a specific client to generate an invoice.</p>
         </div>
       </div>
 
