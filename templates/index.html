@@ -338,8 +338,11 @@
               </div>
               <div class="flex items-center gap-3 shrink-0">
                 <span class="text-sm font-semibold text-gray-700" x-text="config.currency_symbol + e.amount.toFixed(2)"></span>
-                <button @click="openEditor('work', e, $event.currentTarget)" class="text-blue-600 hover:text-blue-800 px-2 min-h-[44px] text-sm font-medium">Edit</button>
-                <button @click="deleteEntry(e.id)" class="text-red-400 hover:text-red-600 p-2 -mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <button @click="openEditor('work', e, $event.currentTarget)" aria-label="Edit work entry" title="Edit work entry"
+                  class="text-blue-600 hover:text-blue-800 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  <span class="icon text-xl" x-html="icons.edit"></span>
+                </button>
+                <button @click="deleteEntry(e.id)" aria-label="Delete work entry" title="Delete work entry" class="text-red-400 hover:text-red-600 p-2 -mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
                   <span class="icon text-xl" x-html="icons.delete"></span>
                 </button>
               </div>
@@ -363,8 +366,11 @@
               </div>
               <div class="flex items-center gap-3 shrink-0">
                 <span class="text-sm font-semibold text-gray-700" x-text="config.currency_symbol + e.amount.toFixed(2)"></span>
-                <button @click="openEditor('expense', e, $event.currentTarget)" class="text-blue-600 hover:text-blue-800 px-2 min-h-[44px] text-sm font-medium">Edit</button>
-                <button @click="deleteExpense(e.id)" class="text-red-400 hover:text-red-600 p-2 -mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <button @click="openEditor('expense', e, $event.currentTarget)" aria-label="Edit expense" title="Edit expense"
+                  class="text-blue-600 hover:text-blue-800 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  <span class="icon text-xl" x-html="icons.edit"></span>
+                </button>
+                <button @click="deleteExpense(e.id)" aria-label="Delete expense" title="Delete expense" class="text-red-400 hover:text-red-600 p-2 -mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
                   <span class="icon text-xl" x-html="icons.delete"></span>
                 </button>
               </div>
