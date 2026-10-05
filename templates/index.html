@@ -194,7 +194,7 @@
           </template>
         </select>
 
-        <form x-show="reportMode === 'range'" @submit.prevent="loadRange()" class="mb-4" novalidate>
+        <div x-show="reportMode === 'range'" class="mb-4">
           <div class="flex flex-wrap gap-2 mb-3" aria-label="Report date shortcuts">
             <button type="button" class="date-chip" @click="setRangePreset('week')">This week</button>
             <button type="button" class="date-chip" @click="setRangePreset('month')">This month</button>
@@ -214,9 +214,9 @@
           </div>
           <p class="text-xs text-gray-500 mt-1">Includes both dates.</p>
           <p id="range-error" role="alert" x-show="rangeError" x-text="rangeError" class="text-sm text-red-600 mt-1"></p>
-          <button type="submit" :disabled="rangeLoading" class="secondary-button mt-2" x-text="rangeLoading ? 'Updating…' : 'Refresh report'"></button>
+          <button type="button" x-show="rangeLoadFailed" @click="loadRange()" class="secondary-button mt-2">Try again</button>
           <p role="status" x-show="rangeLoading" class="text-sm text-gray-500 mt-1">Loading report…</p>
-        </form>
+        </div>
 
         <div x-show="reportLoading" role="status" class="notice">Loading report…</div>
         <div x-show="reportError" role="alert" class="notice notice-error"><p x-text="reportError"></p><button class="secondary-button mt-2" @click="loadReport()">Try again</button></div>

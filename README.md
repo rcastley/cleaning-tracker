@@ -126,7 +126,7 @@ and `node tests/test_editor.cjs`.
 ### Custom date reports
 
 In **Reports → Custom dates**, select the start and end dates. Reports update when
-those dates or the client change; **Refresh report** refreshes or retries the request.
+those dates or the client change. **Try again** appears only if loading fails.
 Both dates are included, and ranges can span months or years. Select a client and
 choose **View Invoice** to print or save as PDF using your browser. Expense-only
 periods can also be invoiced. Custom invoice references use

@@ -128,6 +128,7 @@ function app() {
     rangeRequest: 0,
     rangeLoading: false,
     rangeError: '',
+    rangeLoadFailed: false,
     get rangeKey() { return JSON.stringify([this.reportClientId, this.rangeStart, this.rangeEnd]); },
     get rangeReady() { return !!this.rangeData && this.rangeLoadedKey === this.rangeKey && !this.rangeLoading && !this.rangeError; },
     get periodData() { return this.reportMode === 'range' && this.rangeData ? this.rangeData : this.monthlyData; },
@@ -313,6 +314,7 @@ function app() {
       const request = ++this.rangeRequest;
       const key = this.rangeKey;
       this.rangeError = '';
+      this.rangeLoadFailed = false;
       this.reportError = '';
       this.rangeLoadedKey = '';
       this.rangeLoading = false;
@@ -335,6 +337,7 @@ function app() {
       } catch (error) {
         if (request === this.rangeRequest && key === this.rangeKey) {
           this.rangeError = error.message || 'Unable to load report. Please try again.';
+          this.rangeLoadFailed = true;
         }
       } finally {
         if (request === this.rangeRequest) this.rangeLoading = false;
