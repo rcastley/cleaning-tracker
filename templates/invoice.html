@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Invoice {{ invoice_number }}</title>
     <style>
         * {
@@ -173,7 +174,29 @@
             color: #9ca3af;
             font-size: 10px;
         }
+        .print-toolbar { position: sticky; top: 0; z-index: 1; background: white; padding: 12px 0; margin-bottom: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-bottom: 1px solid #e2e8f0; }
+        .print-toolbar button { min-height: 48px; padding: 12px 20px; border: 0; border-radius: 10px; background: #2563eb; color: white; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .print-toolbar p { font-size: 13px; color: #475569; }
+        .table-scroll { overflow-x: auto; }
+        tr, .totals, .payment-details { break-inside: avoid; }
+        thead { display: table-header-group; }
+        @media screen and (max-width: 600px) {
+            body { padding: 12px; font-size: 14px; }
+            .print-toolbar button { width: 100%; }
+            .invoice-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 10px; }
+            .meta-item { text-align: left; min-width: 0; overflow-wrap: anywhere; }
+            .header { gap: 12px; }
+            .business-details { max-width: 55%; overflow-wrap: anywhere; font-size: 12px; }
+            .invoice-title { font-size: 24px; }
+            .address-block { width: 100%; }
+            table { min-width: 460px; }
+            td, th { font-size: 12px; }
+            .payment-grid, .total-row { font-size: 13px; }
+        }
         @media print {
+            .print-toolbar { display: none; }
+            .table-scroll { overflow: visible; }
+
             body {
                 padding: 0;
                 -webkit-print-color-adjust: exact;
@@ -186,6 +209,10 @@
     </style>
 </head>
 <body>
+    <div class="print-toolbar">
+        <button type="button" onclick="window.print()">Print / Save PDF</button>
+        <p>Use your device’s print options to print or save a copy.</p>
+    </div>
     <div class="header">
         <div class="invoice-title">INVOICE</div>
         <div class="business-details">
@@ -224,7 +251,7 @@
     </div>
 
     <div class="section-title">Labour</div>
-    <table>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Labour details"><table>
         <thead>
             <tr>
                 <th>Date</th>
@@ -245,12 +272,12 @@
             </tr>
             {% endfor %}
         </tbody>
-    </table>
+    </table></div>
 
     {% if expenses %}
     <div class="expenses-section">
         <div class="section-title">Expenses (receipts attached)</div>
-        <table class="expenses-table">
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Expense details"><table class="expenses-table">
             <thead>
                 <tr>
                     <th>Date</th>
@@ -267,7 +294,7 @@
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        </table></div>
     </div>
     {% endif %}
 

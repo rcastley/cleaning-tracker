@@ -2,6 +2,8 @@
 
 from datetime import datetime
 import math
+import hashlib
+from pathlib import Path
 import re
 from flask import Flask, jsonify, request, render_template, abort
 from flask_compress import Compress
@@ -63,7 +65,10 @@ def _filter_by_dates(items, start, end):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # Keep markup and assets in sync after deployment, even with browser caching.
+    versions = {name: hashlib.sha256((Path(app.static_folder) / name).read_bytes()).hexdigest()[:12]
+                for name in ("app.js", "tailwind.css")}
+    return render_template("index.html", asset_versions=versions)
 
 
 @app.route("/api/bootstrap")

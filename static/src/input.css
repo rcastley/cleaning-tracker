@@ -1,3 +1,74 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Shared mobile controls: generous targets, visible focus and readable text. */
+:root { color-scheme: light; }
+body { color: #172c43; background: #f4f7fb; -webkit-tap-highlight-color: transparent; }
+button, summary { min-height: 44px; touch-action: manipulation; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+input, select, textarea { min-width: 0; font-size: 16px !important; }
+input, select { min-height: 48px; }
+select { padding-right: 2.5rem !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none' stroke='%23475569' stroke-width='1.5'%3E%3Cpath d='m5 7 5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .75rem center; }
+input[type=date], input[type=time] { width: 100%; text-align: left; }
+input[type=date]::-webkit-date-and-time-value, input[type=time]::-webkit-date-and-time-value { text-align: left; }
+.text-gray-400 { color: #64748b; }
+label { font-size: .875rem !important; color: #475569; }
+main { padding-bottom: 2rem; }
+.page-heading { margin-bottom: 1.25rem; }
+.page-heading h1 { font-size: 1.65rem; font-weight: 750; line-height: 1.25; letter-spacing: -.035em; color: #142d4e; }
+.page-heading p { font-size: .875rem; color: #64748b; margin-top: .4rem; line-height: 1.5; }
+.field-label { display: block; font-weight: 600; margin-bottom: .4rem; }
+.segmented { display: flex; gap: 4px; padding: 4px; background: #e7edf5; border-radius: 14px; }
+.segmented button { min-width: 0; border-radius: 10px; }
+.segmented button[aria-pressed=true] { color: #1d4ed8; background: white; box-shadow: 0 1px 4px #172c431a; }
+.primary-button, .secondary-button, .date-chip { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: 12px; font-size: .875rem; font-weight: 650; padding: .65rem 1rem; }
+.primary-button { color: white; background: #2563eb; min-height: 48px; }
+.primary-button:hover { background: #1d4ed8; }
+.secondary-button { color: #334155; background: white; border: 1px solid #cbd5e1; }
+.secondary-button:hover, .date-chip:hover { background: #eff6ff; }
+.date-chip { color: #1d4ed8; background: #eff6ff; border: 1px solid #dbeafe; }
+.notice { padding: 1rem; margin-bottom: 1rem; background: #eff6ff; border: 1px solid #dbeafe; border-radius: 14px; font-size: .875rem; line-height: 1.5; }
+.notice-error { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+.notice-success { color: #065f46; background: #ecfdf5; border-color: #a7f3d0; }
+.notice-success p { font-size: .8125rem; margin-top: .2rem; }
+.invoice-action { margin: 0 0 1rem; }
+.report-summary { background: white; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden; }
+.summary-total { padding: 1rem 1.25rem; background: #edf5ff; color: #1e40af; }
+.summary-total span, .summary-total small { display: block; font-size: .8125rem; }
+.summary-total strong { display: block; font-size: 2rem; line-height: 1.3; font-weight: 750; letter-spacing: -.03em; }
+.summary-total small { color: #526785; margin-top: .2rem; }
+.summary-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1rem .75rem; padding: 1rem 1.25rem; }
+.summary-grid dt { font-size: .75rem; color: #64748b; }
+.summary-grid dd { font-weight: 650; font-size: .95rem; margin-top: .2rem; overflow-wrap: anywhere; }
+.report-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border-bottom: 1px solid #f1f5f9; }
+.report-row > div { min-width: 0; overflow-wrap: anywhere; }
+.history-filters { margin-bottom: 1rem; }
+.history-filters input, .history-filters select { display: block; width: 100%; background-color: white; border: 1px solid #cbd5e1; border-radius: 12px; padding: .7rem .8rem; }
+.history-card { padding: 1rem; border: 1px solid #e2e8f0; border-radius: 16px; background: white; box-shadow: 0 2px 5px #172c4304; }
+.history-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.history-card h2 { font-size: .95rem; font-weight: 650; }
+.history-card p { overflow-wrap: anywhere; font-size: .8125rem; color: #64748b; line-height: 1.5; }
+.history-amount { flex-shrink: 0; font-size: 1.1rem; color: #172c43; font-variant-numeric: tabular-nums; }
+.history-card-footer { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding-top: .6rem; margin-top: .6rem; border-top: 1px solid #f1f5f9; }
+.icon-button { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; }
+.edit-button { color: #1d4ed8; background: #eff6ff; }
+.delete-button { color: #b91c1c; background: #fff5f5; }
+.empty-state { padding: 2rem 1rem; text-align: center; border: 1px dashed #cbd5e1; border-radius: 16px; background: white; }
+.empty-state h2 { font-weight: 650; }
+.empty-state p { margin-top: .5rem; color: #64748b; font-size: .875rem; }
+.mobile-nav { box-shadow: 0 -4px 20px #172c4308; padding-top: .3rem; }
+.mobile-nav button { min-height: 60px; gap: .15rem; position: relative; }
+.mobile-nav button[aria-current=page]::before { content: ''; position: absolute; top: 0; width: 28px; height: 3px; background: #2563eb; border-radius: 3px; }
+.editor-actions { position: sticky; bottom: -1rem; background: white; padding-bottom: 1rem; border-top: 1px solid #e2e8f0; }
+.settings-save { position: sticky; bottom: 0; background: #f4f7fb; padding: .5rem 0; z-index: 10; }
+.settings-save button { margin-bottom: 0; }
+@media (max-width: 767px) {
+  body { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  header.safe-top { height: auto; min-height: calc(52px + env(safe-area-inset-top)); }
+  .settings-save { bottom: calc(70px + env(safe-area-inset-bottom)); }
+  .editor-overlay { align-items: flex-end; padding: 0; }
+  .editor-overlay > section { border-radius: 20px 20px 0 0; max-height: 92dvh; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }

@@ -29,6 +29,14 @@ class ReportTests(unittest.TestCase):
         save_json(webapp.CLIENTS_FILE, [dict(id='a', name='Client A', address=''),
                                        dict(id='b', name='Client B', address='')])
 
+    def test_page_uses_content_versioned_assets(self):
+        import hashlib
+        from pathlib import Path
+        html = self.client.get('/').get_data(as_text=True)
+        for name in ('app.js', 'tailwind.css'):
+            version = hashlib.sha256((Path(webapp.app.static_folder) / name).read_bytes()).hexdigest()[:12]
+            self.assertIn(name + '?v=' + version, html)
+
     def test_inclusive_cross_year_range_and_client_filter(self):
         query = '?start_date=2025-12-31&end_date=2026-01-01'
         report = self.client.get('/api/reports/range' + query + '&client_id=a').get_json()

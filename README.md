@@ -126,7 +126,7 @@ and `node tests/test_editor.cjs`.
 ### Custom date reports
 
 In **Reports → Custom dates**, select the start and end dates. Reports update when
-those dates or the client change; **Update report** refreshes or retries the request.
+those dates or the client change; **Refresh report** refreshes or retries the request.
 Both dates are included, and ranges can span months or years. Select a client and
 choose **View Invoice** to print or save as PDF using your browser. Expense-only
 periods can also be invoiced. Custom invoice references use
@@ -134,3 +134,22 @@ periods can also be invoiced. Custom invoice references use
 
 Run report checks with `.venv/bin/python -m unittest discover -s tests`
 and `node tests/test_reports.cjs`.
+
+### Mobile usability
+
+- **Add entry** has today/yesterday shortcuts, side-by-side time fields, overnight
+  guidance, penny-precision expenses and a saved-entry confirmation. Failed saves
+  retain the draft and repeated taps cannot submit a second request while saving.
+- **History** supports search by client, date, description or amount, a client
+  filter, matching totals and 20 records at a time. Cards show full dates and keep
+  edit/delete targets separate from the record details.
+- **Reports** offer this-week/this-month/last-month shortcuts, a compact totals
+  panel, loading/retry states and a prominent invoice action with guidance.
+- **Invoices** have a Print / Save PDF button, a phone-friendly preview and
+  repeating table headers for longer printed reports.
+- Larger touch targets, labelled fields, visible keyboard focus, a mobile edit
+  sheet and a reachable settings-save button support small-screen use.
+- App JavaScript and CSS URLs include content versions to avoid stale assets
+  after deployment.
+
+Additional interaction checks: `node tests/test_mobile_ux.cjs`.

@@ -1,5 +1,6 @@
 function app() {
-  const today = new Date().toISOString().slice(0, 10);
+  const localDate = date => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+  const today = localDate(new Date());
 
   const ICONS = {
     edit: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>',
@@ -15,7 +16,7 @@ function app() {
     icons: ICONS,
 
     tabs: [
-      { id: 'log', label: 'Log', icon: 'edit_note' },
+      { id: 'log', label: 'Add entry', icon: 'edit_note' },
       { id: 'reports', label: 'Reports', icon: 'bar_chart' },
       { id: 'history', label: 'History', icon: 'list_alt' },
       { id: 'settings', label: 'Settings', icon: 'settings' },
@@ -27,6 +28,84 @@ function app() {
     entries: [],
     expenses: [],
     saving: false,
+    bootLoading: true,
+    bootError: '',
+    logError: '',
+    lastSaved: null,
+    historyLoading: false,
+    historyError: '',
+    historySearch: '',
+    historyClientId: '',
+    historyLimit: 20,
+    reportLoading: false,
+    reportError: '',
+    reportRequest: 0,
+    deleteBusy: false,
+    deleteError: '',
+
+    get pageTitle() { return { log: 'Add an entry', reports: 'Reports & invoices', history: 'Your history', settings: 'Settings' }[this.tab]; },
+    get pageDescription() { return { log: 'Keep your hours and expenses up to date.', reports: 'Choose a period. Check your totals. Create an invoice.', history: 'Find, review and update your saved records.', settings: 'Manage your business, clients and payment details.' }[this.tab]; },
+    get filteredHistory() {
+      const records = this.historyMode === 'work' ? this.sortedEntries : this.sortedExpenses;
+      const query = this.historySearch.trim().toLowerCase();
+      return records.filter(e => (!this.historyClientId || e.client_id === this.historyClientId) &&
+        (!query || [this.clientName(e.client_id), e.date, this.fullDate(e.date), e.description || '', String(e.amount)]
+          .join(' ').toLowerCase().includes(query)));
+    },
+    get historyTotal() { return this.filteredHistory.reduce((total, e) => total + e.amount, 0); },
+    get visibleHistory() { return this.filteredHistory.slice(0, this.historyLimit); },
+    get canInvoice() {
+      return !!this.reportClientId && !this.reportLoading && !this.reportError &&
+        (this.reportMode === 'range' ? this.rangeReady : !!this.selectedMonth) &&
+        (this.periodData.sessions > 0 || this.periodData.expenses.length > 0);
+    },
+    get invoiceHint() {
+      if (!this.reportClientId) return 'Select one client to create an invoice.';
+      if (this.rangeLoading || this.reportLoading) return 'Your report is loading…';
+      if (this.reportError || (this.reportMode === 'range' && !this.rangeReady)) return 'Choose a valid period and load your report first.';
+      if (!this.canInvoice) return 'No work or expenses to invoice for this period.';
+      return 'Opens a preview with a Print / Save PDF button.';
+    },
+    fullDate(iso) {
+      if (!iso) return '';
+      return new Date(iso.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    },
+    setLogDate(offset) {
+      const date = new Date();
+      date.setDate(date.getDate() + offset);
+      this[this.logMode === 'work' ? 'workDate' : 'expDate'] = localDate(date);
+    },
+    setRangePreset(preset) {
+      const end = new Date(), start = new Date(end);
+      if (preset === 'week') start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+      if (preset === 'month') start.setDate(1);
+      if (preset === 'lastmonth') {
+        start.setDate(1);
+        start.setMonth(start.getMonth() - 1);
+        end.setDate(0);
+      }
+      this.rangeStart = localDate(start);
+      this.rangeEnd = localDate(end);
+      return this.loadRange();
+    },
+    async loadHistory() {
+      this.historyLoading = true;
+      this.historyError = '';
+      try {
+        const [entries, expenses] = await Promise.all([this.api('/api/entries'), this.api('/api/expenses')]);
+        this.entries = entries;
+        this.expenses = expenses;
+      } catch (error) { this.historyError = 'Unable to refresh history. Please try again.'; }
+      finally { this.historyLoading = false; }
+    },
+    viewSaved() {
+      this.historyMode = this.lastSaved.kind === 'work' ? 'work' : 'expenses';
+      this.historyClientId = this.lastSaved.client_id;
+      this.historySearch = '';
+      this.historyLimit = 20;
+      this.tab = 'history';
+      this.onTabSwitch('history');
+    },
 
     logMode: 'work',
     logClientId: '',
@@ -135,16 +214,21 @@ function app() {
     },
 
     async init() {
-      const data = await this.api('/api/bootstrap');
-      this.config = data.config;
-      this.clients = data.clients;
-      this.entries = data.entries;
-      this.expenses = data.expenses;
-      if (this.clients.length) {
-        this.logClientId = this.clients[0].id;
-        this.workMiles = this.clients[0].default_miles || 0;
-        if (this.clients.length === 1) this.reportClientId = this.clients[0].id;
-      }
+      this.bootLoading = true;
+      this.bootError = '';
+      try {
+        const data = await this.api('/api/bootstrap');
+        this.config = data.config;
+        this.clients = data.clients;
+        this.entries = data.entries;
+        this.expenses = data.expenses;
+        if (this.clients.length) {
+          this.logClientId = this.clients[0].id;
+          this.workMiles = this.clients[0].default_miles || 0;
+          if (this.clients.length === 1) this.reportClientId = this.clients[0].id;
+        }
+      } catch (error) { this.bootError = 'Unable to load your data. Check your connection and try again.'; }
+      finally { this.bootLoading = false; }
     },
 
     async loadConfig() { this.config = await this.api('/api/config'); },
@@ -153,51 +237,64 @@ function app() {
     async loadExpenses() { this.expenses = await this.api('/api/expenses'); },
 
     onTabSwitch(id) {
+      document.body.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
       if (id === 'reports') {
         this.loadReport();
       } else if (id === 'history') {
-        this.loadEntries();
-        this.loadExpenses();
+        this.loadHistory();
       }
     },
 
     async saveWork() {
+      if (this.saving) return;
+      this.logError = '';
+      if (!this.logClientId || !this.workDate || !this.workStart || !this.workEnd || this.workStart === this.workEnd || !Number.isFinite(Number(this.workMiles)) || Number(this.workMiles) < 0) {
+        this.logError = 'Choose a client and date, different start and end times, and miles of zero or more.';
+        return;
+      }
       this.saving = true;
       try {
         const clientId = this.clients.length === 1 ? this.clients[0].id : this.logClientId;
-        await this.api('/api/entries', 'POST', {
+        const saved = await this.api('/api/entries', 'POST', {
           client_id: clientId,
           date: this.workDate,
           start_time: this.workStart,
           end_time: this.workEnd,
           miles: this.workMiles,
         });
-        this.showToast('Entry saved!', 'success');
-        this.workDate = today;
-        this.updateMilesFromClient();
-        this.loadEntries();
+        this.entries.push(saved);
+        this.lastSaved = { ...saved, kind: 'work' };
+        this.showToast('Work entry saved', 'success');
       } catch (e) {
-        this.showToast('Failed to save', 'error');
+        this.logError = e.message || 'Unable to save. Your entry is still here; please try again.';
       }
       this.saving = false;
     },
 
     async saveExpense() {
+      if (this.saving) return;
+      this.logError = '';
+      if (!this.logClientId || !this.expDate || !Number.isFinite(Number(this.expAmount)) || Number(this.expAmount) <= 0) {
+        this.logError = 'Choose a client and date, and enter an amount greater than zero.';
+        return;
+      }
       this.saving = true;
       try {
         const clientId = this.clients.length === 1 ? this.clients[0].id : this.logClientId;
-        await this.api('/api/expenses', 'POST', {
+        const saved = await this.api('/api/expenses', 'POST', {
           client_id: clientId,
           date: this.expDate,
           amount: this.expAmount,
           description: this.expDesc,
         });
-        this.showToast('Expense saved!', 'success');
+        this.expenses.push(saved);
+        this.lastSaved = { ...saved, kind: 'expense' };
+        this.showToast('Expense saved', 'success');
         this.expAmount = 0;
         this.expDesc = 'Cleaning supplies';
-        this.loadExpenses();
       } catch (e) {
-        this.showToast('Failed to save', 'error');
+        this.logError = e.message || 'Unable to save. Your entry is still here; please try again.';
       }
       this.saving = false;
     },
@@ -209,9 +306,12 @@ function app() {
     },
 
     async loadRange() {
+      ++this.reportRequest;
+      this.reportLoading = false;
       const request = ++this.rangeRequest;
       const key = this.rangeKey;
       this.rangeError = '';
+      this.reportError = '';
       this.rangeLoadedKey = '';
       this.rangeLoading = false;
       if (!this.rangeStart || !this.rangeEnd) {
@@ -239,49 +339,46 @@ function app() {
       }
     },
 
-    async loadMonthly() {
-      let url = '/api/reports/monthly?';
-      if (this.reportClientId) url += 'client_id=' + this.reportClientId + '&';
-      if (this.selectedMonth) {
-        const [y, m] = this.selectedMonth.split('-');
-        url += 'year=' + y + '&month=' + m;
-      }
-      const data = await this.api(url);
-      const prevMonth = this.selectedMonth;
-      this.monthlyData = data;
-      if (!prevMonth && data.available_months.length) {
-        this.selectedMonth = data.available_months[0].year + '-' + data.available_months[0].month;
-        await this.loadMonthly();
-        return;
-      }
-      const valid = data.available_months.some(m => m.year + '-' + m.month === prevMonth);
-      if (!valid && data.available_months.length) {
-        this.selectedMonth = data.available_months[0].year + '-' + data.available_months[0].month;
-        await this.loadMonthly();
-      }
-    },
-
-    async loadTaxYear() {
-      let url = '/api/reports/taxyear?';
-      if (this.reportClientId) url += 'client_id=' + this.reportClientId + '&';
-      if (this.selectedTaxYear) url += 'tax_year=' + this.selectedTaxYear;
-      const data = await this.api(url);
-      const prev = this.selectedTaxYear;
-      this.taxYearData = data;
-      if (!prev && data.available_tax_years.length) {
-        this.selectedTaxYear = String(data.available_tax_years[0].year);
-        await this.loadTaxYear();
-        return;
-      }
-      const valid = data.available_tax_years.some(ty => String(ty.year) === String(prev));
-      if (!valid && data.available_tax_years.length) {
-        this.selectedTaxYear = String(data.available_tax_years[0].year);
-        await this.loadTaxYear();
-      }
+    loadMonthly() { return this.loadStandardReport('monthly'); },
+    loadTaxYear() { return this.loadStandardReport('taxyear'); },
+    async loadStandardReport(mode) {
+      const request = ++this.reportRequest;
+      const client = this.reportClientId;
+      const monthly = mode === 'monthly';
+      const selection = monthly ? 'selectedMonth' : 'selectedTaxYear';
+      const property = monthly ? 'monthlyData' : 'taxYearData';
+      const available = monthly ? 'available_months' : 'available_tax_years';
+      const key = item => monthly ? item.year + '-' + item.month : String(item.year);
+      const params = new URLSearchParams();
+      if (client) params.set('client_id', client);
+      const fetchPeriod = async value => {
+        if (value) {
+          if (monthly) {
+            const [year, month] = value.split('-');
+            params.set('year', year); params.set('month', month);
+          } else params.set('tax_year', value);
+        }
+        return this.api('/api/reports/' + mode + '?' + params);
+      };
+      this.reportLoading = true;
+      this.reportError = '';
+      try {
+        let value = this[selection];
+        let data = await fetchPeriod(value);
+        if (data[available].length && !data[available].some(item => key(item) === value)) {
+          value = key(data[available][0]);
+          data = await fetchPeriod(value);
+        }
+        if (request !== this.reportRequest || client !== this.reportClientId || mode !== this.reportMode) return;
+        this[selection] = data[available].length ? value : '';
+        this[property] = data;
+      } catch (error) {
+        if (request === this.reportRequest && mode === this.reportMode) this.reportError = 'Unable to load this report. Please try again.';
+      } finally { if (request === this.reportRequest) this.reportLoading = false; }
     },
 
     openInvoice() {
-      if (!this.reportClientId) return;
+      if (!this.reportClientId || this.reportLoading || this.reportError) return;
       const params = new URLSearchParams({ client_id: this.reportClientId });
       if (this.reportMode === 'range') {
         if (!this.rangeReady) return;
@@ -296,23 +393,36 @@ function app() {
       window.open('/invoice?' + params, '_blank');
     },
 
+    async confirmDelete() {
+      if (this.deleteBusy) return;
+      this.deleteBusy = true;
+      this.deleteError = '';
+      try {
+        await this.deleteConfirm.action();
+        this.deleteConfirm.show = false;
+      } catch (error) { this.deleteError = 'Unable to delete. Please try again.'; }
+      finally { this.deleteBusy = false; }
+    },
+
     deleteEntry(id) {
+      this.deleteError = '';
       this.deleteConfirm = {
         show: true, type: 'entry',
         action: async () => {
           await this.api('/api/entries/' + encodeURIComponent(id), 'DELETE');
           this.showToast('Entry deleted', 'success');
-          this.loadEntries();
+          this.entries = this.entries.filter(e => e.id !== id);
         }
       };
     },
     deleteExpense(id) {
+      this.deleteError = '';
       this.deleteConfirm = {
         show: true, type: 'expense',
         action: async () => {
           await this.api('/api/expenses/' + encodeURIComponent(id), 'DELETE');
           this.showToast('Expense deleted', 'success');
-          this.loadExpenses();
+          this.expenses = this.expenses.filter(e => e.id !== id);
         }
       };
     },
@@ -339,6 +449,7 @@ function app() {
     },
 
     deleteClient(id) {
+      this.deleteError = '';
       this.deleteConfirm = {
         show: true, type: 'client',
         action: async () => {
@@ -395,7 +506,8 @@ function app() {
 
     showToast(msg, type) {
       this.toast = { show: true, msg, type };
-      setTimeout(() => this.toast.show = false, 2500);
+      clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => this.toast.show = false, 4000);
     },
 
     async api(url, method = 'GET', body = null) {
