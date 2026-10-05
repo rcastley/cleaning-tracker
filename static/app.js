@@ -190,7 +190,9 @@ function app() {
     newClientName: '',
     newClientAddress: '',
     newClientMiles: 0,
-    confirmAction: null,
+    backupBusy: false,
+    backupError: '',
+    backupStatus: '',
     deleteConfirm: { show: false, type: '', action: () => {} },
 
     toast: { show: false, msg: '', type: 'success' },
@@ -460,11 +462,32 @@ function app() {
       };
     },
 
-    async clearData(type) {
-      await this.api('/api/' + type + '?confirm=true', 'DELETE');
-      this.showToast('All ' + type + ' cleared', 'success');
-      if (type === 'entries') this.loadEntries();
-      else this.loadExpenses();
+    async downloadBackup() {
+      if (this.backupBusy) return;
+      this.backupBusy = true;
+      this.backupError = '';
+      this.backupStatus = '';
+      let url;
+      try {
+        const response = await fetch('/api/backup', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Unable to create your backup. Please try again.');
+        const blob = await response.blob();
+        url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const disposition = response.headers.get('Content-Disposition') || '';
+        link.download = disposition.match(/filename="?([^";]+)"?/)?.[1] || 'cleaning-tracker-backup.zip';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        this.backupStatus = 'Backup download started. Check your Files or Downloads folder to confirm it was saved.';
+      } catch (error) {
+        this.backupError = 'Unable to download your backup. Check your connection and try again.';
+      } finally {
+        // Give mobile browsers time to hand off the file to their download manager.
+        if (url) setTimeout(() => URL.revokeObjectURL(url), 60000);
+        this.backupBusy = false;
+      }
     },
 
     updateMilesFromClient() {

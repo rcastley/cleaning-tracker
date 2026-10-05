@@ -1,11 +1,14 @@
 """Flask web app — mobile-first UI for Cleaning Tracker."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 import hashlib
+import io
+import json
+import zipfile
 from pathlib import Path
 import re
-from flask import Flask, jsonify, request, render_template, abort
+from flask import Flask, jsonify, request, render_template, abort, send_file
 from flask_compress import Compress
 
 from helpers import (
@@ -80,6 +83,43 @@ def bootstrap():
         "entries": load_json(ENTRIES_FILE, []),
         "expenses": load_json(EXPENSES_FILE, []),
     })
+
+
+@app.route("/api/backup")
+def download_backup():
+    """Download a portable copy of saved data without changing any records."""
+    created = datetime.now(timezone.utc)
+    files = {
+        "entries.json": load_json(ENTRIES_FILE, []),
+        "expenses.json": load_json(EXPENSES_FILE, []),
+        "clients.json": load_json(CLIENTS_FILE, list(DEFAULT_CLIENTS)),
+        "config.json": load_config(),
+        "backup-info.json": {
+            "application": "Cleaning Tracker",
+            "format_version": 1,
+            "created_at": created.isoformat(),
+        },
+    }
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as backup:
+        for name, data in files.items():
+            backup.writestr(name, json.dumps(data, ensure_ascii=False, indent=2))
+        backup.writestr("README.txt", (
+            "Cleaning Tracker backup\n\n"
+            "Includes saved work entries, expenses, clients and settings.\n"
+            "Settings include business and payment details. Keep this file private.\n\n"
+            "To restore: stop the application, keep a copy of its current data folder,\n"
+            "then copy entries.json, expenses.json, clients.json and config.json\n"
+            "from this archive into the application's data folder and restart it.\n"
+            "Restoring replaces the current records; it does not merge them.\n"
+            "Ask the person who manages the application to do this if needed.\n"
+        ))
+    archive.seek(0)
+    response = send_file(archive, mimetype="application/zip", as_attachment=True,
+                         download_name=created.strftime("cleaning-tracker-backup-%Y-%m-%d-%H%M%S.zip"),
+                         max_age=0)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.route("/invoice")
@@ -240,14 +280,6 @@ def delete_entry(entry_id):
     return jsonify({"ok": True})
 
 
-@app.route("/api/entries", methods=["DELETE"])
-def clear_entries():
-    if request.args.get("confirm") != "true":
-        abort(400, "Pass ?confirm=true to clear all entries")
-    save_json(ENTRIES_FILE, [])
-    return jsonify({"ok": True})
-
-
 # ---------------------------------------------------------------------------
 # Expenses API
 # ---------------------------------------------------------------------------
@@ -283,14 +315,6 @@ def delete_expense(expense_id):
     expenses = load_json(EXPENSES_FILE, [])
     expenses = [e for e in expenses if e["id"] != expense_id]
     save_json(EXPENSES_FILE, expenses)
-    return jsonify({"ok": True})
-
-
-@app.route("/api/expenses", methods=["DELETE"])
-def clear_expenses():
-    if request.args.get("confirm") != "true":
-        abort(400, "Pass ?confirm=true to clear all expenses")
-    save_json(EXPENSES_FILE, [])
     return jsonify({"ok": True})
 
 

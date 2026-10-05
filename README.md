@@ -98,8 +98,8 @@ backup.sh              Data backup script
 JSON endpoints (all return `application/json`):
 
 - `GET /api/bootstrap` — config + clients + entries + expenses in one call (used on initial page load)
-- `GET|POST|DELETE /api/entries` (`?client_id=…`) and `PUT|DELETE /api/entries/<id>`
-- `GET|POST|DELETE /api/expenses` and `PUT|DELETE /api/expenses/<id>`
+- `GET|POST /api/entries` (`?client_id=…`) and `PUT|DELETE /api/entries/<id>`
+- `GET|POST /api/expenses` and `PUT|DELETE /api/expenses/<id>`
 - `GET|POST|PUT|DELETE /api/clients` and `<id>` variants
 - `GET|PUT /api/config`
 - `GET /api/reports/monthly?client_id=&year=&month=`
@@ -153,3 +153,21 @@ and `node tests/test_reports.cjs`.
   after deployment.
 
 Additional interaction checks: `node tests/test_mobile_ux.cjs`.
+
+### Phone backups
+
+Go to **Settings → Back up your data → Download backup**. The browser downloads
+`cleaning-tracker-backup-YYYY-MM-DD-HHMMSS.zip` (UTC timestamp). Check Files or
+Downloads to confirm it was saved; you can move it to your preferred backup location.
+The ZIP contains `entries.json`, `expenses.json`, `clients.json`, `config.json`,
+version/timestamp metadata and restore instructions. Only saved data is included.
+Keep the backup private: settings contain business and payment details.
+
+`GET /api/backup` is read-only and returns a ZIP attachment with `Cache-Control: no-store`.
+Bulk-clear controls and the collection DELETE endpoints have been removed.
+Individual record deletion remains available in History with confirmation.
+
+There is no in-app restore button. To restore, stop the app, preserve the current
+`data/` folder, extract the four data JSON files into `data/`, then restart.
+Restoration replaces existing data; it does not merge records. The existing
+server-side `backup.sh` remains available.

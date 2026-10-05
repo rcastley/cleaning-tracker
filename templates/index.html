@@ -29,7 +29,7 @@
 <body class="bg-gray-50 pb-24 md:pb-4 md:pt-16" x-data="app()" x-cloak>
 
   <!-- ===== DESKTOP TOP NAV ===== -->
-  <nav :inert="editor.open || deleteConfirm.show || !!confirmAction" aria-label="Main navigation" class="hidden md:flex fixed top-0 inset-x-0 bg-white border-b border-gray-200 z-40 items-center px-6 h-14">
+  <nav :inert="editor.open || deleteConfirm.show" aria-label="Main navigation" class="hidden md:flex fixed top-0 inset-x-0 bg-white border-b border-gray-200 z-40 items-center px-6 h-14">
     <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="28" height="28" class="shrink-0 w-7 h-7 mr-2">
     <span class="font-bold text-blue-600 text-lg mr-8 whitespace-nowrap">Cleaning Tracker</span>
     <template x-for="t in tabs" :key="t.id">
@@ -55,7 +55,7 @@
   </div>
 
   <!-- ===== MAIN CONTENT ===== -->
-  <main :inert="editor.open || deleteConfirm.show || !!confirmAction" class="max-w-2xl mx-auto px-4 pt-4">
+  <main :inert="editor.open || deleteConfirm.show" class="max-w-2xl mx-auto px-4 pt-4">
 
     <div class="page-heading">
       <h1 x-text="pageTitle"></h1>
@@ -552,23 +552,17 @@
       </button>
 
       </div>
-      <!-- Data management -->
-      <details class="bg-white rounded-lg shadow-sm mb-3">
-        <summary class="px-4 py-3 font-medium text-red-600 cursor-pointer select-none flex items-center justify-between">
-          Data Management
-          <span class="icon text-red-400 text-lg" x-html="icons.expand_more"></span>
-        </summary>
-        <div class="px-4 pb-4 space-y-3">
-          <button @click="confirmAction = 'entries'"
-            class="w-full border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2.5 rounded-lg text-sm transition-colors">
-            Clear All Entries
-          </button>
-          <button @click="confirmAction = 'expenses'"
-            class="w-full border border-red-300 text-red-600 hover:bg-red-50 font-medium py-2.5 rounded-lg text-sm transition-colors">
-            Clear All Expenses
-          </button>
-        </div>
-      </details>
+      <!-- Download a copy of saved data to this device. -->
+      <section class="bg-white rounded-lg shadow-sm p-4 mb-3" aria-labelledby="backup-title">
+        <h2 id="backup-title" class="font-semibold text-gray-800 mb-2">Back up your data</h2>
+        <p class="text-sm text-gray-600 mb-3">Save a copy of all work entries, expenses, clients and settings to your phone.</p>
+        <button @click="downloadBackup()" :disabled="backupBusy || saving" :aria-busy="backupBusy" class="primary-button w-full" x-text="backupBusy ? 'Preparing backup…' : 'Download backup'"></button>
+        <p class="text-sm text-gray-500 mt-3">Your phone will download a ZIP file. Keep it in Files or Downloads, or move it to your preferred backup folder.</p>
+        <p class="text-sm text-gray-500 mt-2">Includes saved settings only. Save any settings changes first. The backup contains client and payment details, so keep it somewhere private.</p>
+        <p class="text-sm text-gray-500 mt-2">To restore a backup, contact the person who manages this app.</p>
+        <p x-show="backupStatus" x-text="backupStatus" role="status" class="notice notice-success mt-3"></p>
+        <p x-show="backupError" x-text="backupError" role="alert" class="notice notice-error mt-3"></p>
+      </section>
     </section>
     </div>
   </main>
@@ -631,22 +625,8 @@
   </div>
 
 
-  <!-- ===== CONFIRM DIALOG ===== -->
-  <div x-show="confirmAction" x-effect="document.body.classList.toggle('dialog-open', !!confirmAction || deleteConfirm.show || editor.open)" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="confirmAction = null">
-    <div class="bg-white rounded-xl shadow-xl mx-4 p-6 max-w-sm w-full">
-      <h3 class="text-lg font-bold text-gray-800 mb-2">Are you sure?</h3>
-      <p class="text-sm text-gray-500 mb-6" x-text="'This will permanently delete all ' + confirmAction + '.'"></p>
-      <div class="flex gap-3">
-        <button @click="confirmAction = null"
-          class="flex-1 border border-gray-300 text-gray-700 font-medium py-2.5 rounded-lg text-sm transition-colors hover:bg-gray-50">Cancel</button>
-        <button @click="clearData(confirmAction); confirmAction = null"
-          class="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors">Delete</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ===== DELETE CONFIRM DIALOG ===== -->
-  <div x-show="deleteConfirm.show" x-effect="document.body.classList.toggle('dialog-open', !!confirmAction || deleteConfirm.show || editor.open)" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="if (!deleteBusy) deleteConfirm.show = false" @keydown.escape="if (!deleteBusy) deleteConfirm.show = false">
+  <div x-show="deleteConfirm.show" x-effect="document.body.classList.toggle('dialog-open', deleteConfirm.show || editor.open)" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="if (!deleteBusy) deleteConfirm.show = false" @keydown.escape="if (!deleteBusy) deleteConfirm.show = false">
     <div role="dialog" aria-modal="true" aria-labelledby="delete-title" class="bg-white rounded-xl shadow-xl mx-4 p-6 max-w-sm w-full">
       <h3 id="delete-title" class="text-lg font-bold text-gray-800 mb-2">Delete this <span x-text="deleteConfirm.type"></span>?</h3>
       <p class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
@@ -661,7 +641,7 @@
   </div>
 
   <!-- ===== MOBILE BOTTOM NAV ===== -->
-  <nav :inert="editor.open || deleteConfirm.show || !!confirmAction" aria-label="Main navigation" class="mobile-nav md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-40 flex safe-bottom">
+  <nav :inert="editor.open || deleteConfirm.show" aria-label="Main navigation" class="mobile-nav md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-40 flex safe-bottom">
     <template x-for="t in tabs" :key="t.id">
       <button @click="tab = t.id; onTabSwitch(t.id)" :aria-current="tab === t.id ? 'page' : null"
         :class="tab === t.id ? 'text-blue-600' : 'text-gray-400'"
