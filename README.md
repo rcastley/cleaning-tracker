@@ -80,7 +80,7 @@ The updater uses the current branch's configured upstream. Git access must work 
 the account running the script (root); private repositories need that account's
 credentials. It fetches while the app is still running and refuses dirty, detached,
 locally ahead, or divergent checkouts. If no new commit exists it leaves the service
-alone. Otherwise it:
+alone and ensures the backup cron job is configured. Otherwise it:
 
 1. Stops the service and creates a private `backups/pre-deploy-*.tar.gz` snapshot,
    with the previous commit recorded alongside it.
@@ -108,6 +108,41 @@ systemd, package installation, and HTTP responses simulated. Run them with
 `.venv/bin/python -m unittest discover -s tests -p test_deployment.py`.
 The first real installation must still be validated inside the target LXC.
 
+### Scheduled backups and restoration
+
+Both installation and updates configure `/etc/cron.d/cleaning-tracker-backup`
+and install/enable Debian/Ubuntu's `cron` service if needed. The job runs daily at
+**02:15 in the container's timezone** and retains the latest **30 successful
+scheduled backups**. Manual, pre-deployment and pre-restore backups are retained
+until you remove them. Repeated installs/updates replace the same cron file;
+they do not add duplicate jobs. An unrelated cron file is never overwritten.
+
+The job briefly stops the app to capture a consistent snapshot, then restarts it
+if it was running. It shares a lock with install/update to avoid overlapping a
+deployment. Files are private (directory mode 700, archive mode 600). Logs go to
+the journal under `cleaning-tracker-backup`. These copies are stored in the LXC;
+copy them off the container or include them in your Proxmox backup plan.
+
+```bash
+sudo ./backup.sh backup
+./backup.sh list
+sudo ./backup.sh restore backups/pre-deploy-<timestamp>.tar.gz
+journalctl -t cleaning-tracker-backup
+cat /etc/cron.d/cleaning-tracker-backup
+systemctl status cron
+```
+
+Restore accepts both legacy archives with JSON files at the top level and
+deployment archives containing `data/`. It validates files before changing data,
+asks for confirmation, creates a pre-restore safety copy, and restores the JSON
+files directly into the active `data/` directory with service-compatible ownership.
+Missing files in an older archive are explicitly reported and left unchanged,
+including issued-invoice history. For local/unmanaged installs, stop the app
+yourself and add `--offline` to the backup or restore command.
+
+When upgrading from scripts that predate cron setup, run `./update.sh` again after
+the first successful update so the newly loaded script configures the schedule.
+
 ## Running locally
 
 ```bash
@@ -133,8 +168,9 @@ JSON files in `./data/` (created on first save):
 - `expenses.json` — expenses
 - `clients.json` — client list
 - `config.json` — app settings
+- `invoices.json` — saved issued invoices
 
-The `data/*.json` files are gitignored. Use `./backup.sh` to snapshot the `data/` folder into `./backups/`.
+The data files are gitignored. Use `sudo ./backup.sh backup` to snapshot them into `./backups/`.
 
 ## Configuration
 
@@ -142,7 +178,7 @@ Configurable from the in-app **Settings** tab. Defaults:
 
 - Hourly rate: £15.00
 - Currency: £ (GBP)
-- Tax year starts: April (UK)
+- Tax year starts: 6 April (UK), ending 5 April the following year. Other selected months start on the first day of that month. Existing April settings use the corrected UK boundary automatically.
 - Payment terms: 14 days
 
 ## Project layout
@@ -188,7 +224,7 @@ JSON endpoints (all return `application/json`):
 History provides an Edit action for work and expenses. Work edits retain the original
 hourly rate and recalculate hours and earnings. Earlier end times indicate overnight
 work. Cancel or Escape asks before discarding changed drafts; failed saves retain them.
-Reports and newly generated invoices use the saved corrections.
+Reports and invoice drafts use saved corrections. Issued invoices retain their original details.
 
 Update requests require client_id and date, plus start_time, end_time and miles for
 work, or amount and description for expenses. IDs and work rates cannot be changed.
@@ -237,7 +273,7 @@ Additional interaction checks: `node tests/test_mobile_ux.cjs`.
 Go to **Settings → Back up your data → Download backup**. The browser downloads
 `cleaning-tracker-backup-YYYY-MM-DD-HHMMSS.zip` (UTC timestamp). Check Files or
 Downloads to confirm it was saved; you can move it to your preferred backup location.
-The ZIP contains `entries.json`, `expenses.json`, `clients.json`, `config.json`,
+The ZIP contains `entries.json`, `expenses.json`, `clients.json`, `config.json`, `invoices.json`,
 version/timestamp metadata and restore instructions. Only saved data is included.
 Keep the backup private: settings contain business and payment details.
 
@@ -246,8 +282,24 @@ Bulk-clear controls and the collection DELETE endpoints have been removed.
 Individual record deletion remains available in History with confirmation.
 
 There is no in-app restore button. To restore, stop the app, preserve the current
-`data/` folder, extract the four data JSON files into `data/`, then restart.
+`data/` folder, extract all five data JSON files into `data/`, then restart.
 Restoration replaces existing data; it does not merge records. The existing
 server-side `backup.sh` remains available.
 
 Bootstrap CSS is vendored from https://getbootstrap.com/ (5.3.8). Alpine handles interactions, so Bootstrap JavaScript is not required. The standalone invoice retains its print-specific CSS. Existing `.cjs` interaction tests optionally use Node’s built-in test utilities; they require no npm dependencies and are not part of installation or deployment.
+
+### Issuing and reprinting invoices
+
+**View invoice** opens a draft until you select **Issue invoice**. Issuing assigns
+a unique sequential reference and fixes the issue date, due date, amounts, client
+and business/payment details. You can then print or save the issued copy as PDF.
+Reopening the same client and inclusive dates returns that saved copy, including
+when a full calendar month is selected using custom dates. Repeated taps do not
+issue duplicates. Issued copies are stored in `data/invoices.json` and included
+in phone and server backups.
+
+Editing records or settings does not revise an issued invoice. There is currently
+no cancellation or replacement workflow; check the draft before issuing. Older
+PDFs printed before this feature cannot be reconstructed automatically. When
+restoring a backup made before this feature, preserve any existing invoices.json
+separately; that backup contains no issued-invoice history.

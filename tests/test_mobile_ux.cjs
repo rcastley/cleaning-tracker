@@ -7,6 +7,9 @@ vm.runInContext(readFileSync('static/app.js', 'utf8'), context);
 
 (async () => {
   const app = context.app();
+  assert.equal(app.fmtHours(1.999), '2h 0m');
+  assert.equal(app.fmtHours(app.entryHours({ start_time: '23:59', end_time: '00:01', hours: 0.03 })), '0h 2m');
+  assert.equal(app.fmtHours(app.entryHours({ minutes: 61, hours: 1.02 })), '1h 1m');
   app.showToast = () => {};
   app.clients = [{ id: 'a', name: 'Long client name' }, { id: 'b', name: 'Other client' }];
   app.entries = Array.from({ length: 25 }, (_, i) => ({ id: String(i), client_id: i % 2 ? 'a' : 'b', date: '2026-01-01', amount: 15, hours: 1 }));

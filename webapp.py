@@ -1,6 +1,11 @@
 """Flask web app — mobile-first UI for Cleaning Tracker."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import calendar
+import fcntl
+import os
+import tempfile
+import uuid
 import math
 import hashlib
 import io
@@ -8,15 +13,14 @@ import json
 import zipfile
 from pathlib import Path
 import re
-from flask import Flask, jsonify, request, render_template, abort, send_file
+from flask import Flask, jsonify, request, render_template, abort, send_file, redirect, url_for
 from flask_compress import Compress
 
 from helpers import (
-    ENTRIES_FILE, EXPENSES_FILE, CONFIG_FILE, CLIENTS_FILE,
+    ENTRIES_FILE, EXPENSES_FILE, CONFIG_FILE, CLIENTS_FILE, INVOICES_FILE,
     DEFAULT_CONFIG, DEFAULT_CLIENTS,
     load_json, save_json, load_config,
-    get_client_by_id,
-    calculate_hours, get_tax_year, get_tax_year_label,
+    calculate_minutes, record_minutes, get_tax_year, get_tax_year_label,
     format_hours, generate_invoice_html,
     calculate_hmrc_mileage_allowance,
 )
@@ -94,6 +98,7 @@ def download_backup():
         "expenses.json": load_json(EXPENSES_FILE, []),
         "clients.json": load_json(CLIENTS_FILE, list(DEFAULT_CLIENTS)),
         "config.json": load_config(),
+        "invoices.json": load_json(INVOICES_FILE, []),
         "backup-info.json": {
             "application": "Cleaning Tracker",
             "format_version": 1,
@@ -106,10 +111,10 @@ def download_backup():
             backup.writestr(name, json.dumps(data, ensure_ascii=False, indent=2))
         backup.writestr("README.txt", (
             "Cleaning Tracker backup\n\n"
-            "Includes saved work entries, expenses, clients and settings.\n"
+            "Includes saved work entries, expenses, clients, settings and issued invoices.\n"
             "Settings include business and payment details. Keep this file private.\n\n"
             "To restore: stop the application, keep a copy of its current data folder,\n"
-            "then copy entries.json, expenses.json, clients.json and config.json\n"
+            "then copy entries.json, expenses.json, clients.json, config.json and invoices.json\n"
             "from this archive into the application's data folder and restart it.\n"
             "Restoring replaces the current records; it does not merge them.\n"
             "Ask the person who manages the application to do this if needed.\n"
@@ -122,9 +127,24 @@ def download_backup():
     return response
 
 
-@app.route("/invoice")
+@app.route("/invoice", methods=['GET', 'POST'])
 def invoice():
-    """Render an invoice as a standalone HTML page."""
+    """Preview without issuing; serialize issuance across worker processes."""
+    if request.method == 'POST':
+        with open(INVOICES_FILE.with_suffix('.lock'), 'a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            return _invoice()
+    return _invoice()
+
+
+def _invoice():
+    saved = load_json(INVOICES_FILE, [])
+    invoice_id = request.args.get('id')
+    if invoice_id:
+        issued = next((item for item in saved if item['id'] == invoice_id), None)
+        if issued is None:
+            abort(404, 'Invoice not found')
+        return issued['html']
     client_id = request.args.get("client_id")
     start = end = None
     year = request.args.get("year", type=int)
@@ -142,12 +162,21 @@ def invoice():
         except (ValueError, TypeError):
             abort(400, "A valid year and month are required")
 
+    period_start = start or datetime(year, month, 1).date()
+    period_end = end or datetime(year, month, calendar.monthrange(year, month)[1]).date()
+    key = [client_id, period_start.isoformat(), period_end.isoformat()]
+    existing = next((item for item in saved if item['key'] == key), None)
+    if existing:
+        return redirect(url_for('invoice', id=existing['id']), code=303)
+
     config = load_config()
     clients = load_json(CLIENTS_FILE, list(DEFAULT_CLIENTS))
     entries = load_json(ENTRIES_FILE, [])
     expenses = load_json(EXPENSES_FILE, [])
 
-    client = get_client_by_id(clients, client_id)
+    client = next((item for item in clients if item['id'] == client_id), None)
+    if client is None:
+        abort(404, 'Client not found')
     entries = _filter_by_client(entries, client_id)
     expenses = _filter_by_client(expenses, client_id)
 
@@ -166,8 +195,35 @@ def invoice():
             and datetime.fromisoformat(e["date"]).month == month
         ]
 
+    issued = None
+    if request.method == 'POST':
+        if not month_entries and not month_expenses:
+            abort(400, 'There are no records to invoice for this period')
+        now = datetime.now()
+        invoice_id = uuid.uuid4().hex
+        issued = dict(id=invoice_id, key=key,
+                      sequence=len(saved) + 1,
+                      number=f"{config['invoice_prefix']}-{now.year}-{len(saved) + 1:06d}",
+                      invoice_date=now.strftime('%d/%m/%Y'),
+                      due_date=(now + timedelta(days=config['payment_terms'])).strftime('%d/%m/%Y'))
     html = generate_invoice_html(month_entries, month_expenses, year, month, config, client,
-                                 start_date=start, end_date=end)
+                                 start_date=start, end_date=end, issued=issued)
+    if issued:
+        issued['html'] = html
+        saved.append(issued)
+        # Keep previously issued invoices intact if a write is interrupted.
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', dir=INVOICES_FILE.parent, delete=False) as output:
+                temporary = output.name
+                json.dump(saved, output, indent=2)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, INVOICES_FILE)
+        finally:
+            if temporary and os.path.exists(temporary):
+                os.unlink(temporary)
+        return redirect(url_for('invoice', id=invoice_id), code=303)
     return html
 
 
@@ -175,8 +231,8 @@ def invoice():
 # Entries API
 # ---------------------------------------------------------------------------
 
-def _validate_edit(data, work=False):
-    """Validate editable fields without accepting derived values from the browser."""
+def _validate_record(data, work=False):
+    """Validate shared create/edit fields without trusting derived values."""
     errors = {}
     clients = load_json(CLIENTS_FILE, list(DEFAULT_CLIENTS))
     if not any(c['id'] == data.get('client_id') for c in clients):
@@ -224,13 +280,14 @@ def _update_record(path, record_id, work=False):
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify(error='Send a JSON object.'), 400
-    errors = _validate_edit(data, work)
+    errors = _validate_record(data, work)
     if errors:
         return jsonify(error='Please check the highlighted fields.', errors=errors), 400
     fields = ('client_id', 'date', 'start_time', 'end_time', 'miles') if work else ('client_id', 'date', 'amount', 'description')
     updated = {**record, **{field: data[field] for field in fields}}
     if work:
-        hours = calculate_hours(updated['start_time'], updated['end_time'])
+        updated['minutes'] = calculate_minutes(updated['start_time'], updated['end_time'])
+        hours = updated['minutes'] / 60
         updated['hours'] = round(hours, 2)
         updated['amount'] = round(hours * record['hourly_rate'], 2)
     else:
@@ -247,14 +304,18 @@ def list_entries():
 
 @app.route("/api/entries", methods=["POST"])
 def create_entry():
-    data = request.get_json(force=True)
-    for field in ("client_id", "date", "start_time", "end_time"):
-        if field not in data:
-            abort(400, f"Missing required field: {field}")
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error='Send a JSON object.'), 400
+    data.setdefault('miles', 0)
+    errors = _validate_record(data, work=True)
+    if errors:
+        return jsonify(error='Please check the entry details.', errors=errors), 400
     config = load_config()
     entries = load_json(ENTRIES_FILE, [])
 
-    hours = calculate_hours(data["start_time"], data["end_time"])
+    minutes = calculate_minutes(data["start_time"], data["end_time"])
+    hours = minutes / 60
     rate = config["hourly_rate"]
     entry = {
         "id": datetime.now().isoformat(),
@@ -263,6 +324,7 @@ def create_entry():
         "start_time": data["start_time"],
         "end_time": data["end_time"],
         "hours": round(hours, 2),
+        "minutes": minutes,
         "hourly_rate": rate,
         "amount": round(hours * rate, 2),
         "miles": float(data.get("miles", 0)),
@@ -292,10 +354,13 @@ def list_expenses():
 
 @app.route("/api/expenses", methods=["POST"])
 def create_expense():
-    data = request.get_json(force=True)
-    for field in ("client_id", "date", "amount"):
-        if field not in data:
-            abort(400, f"Missing required field: {field}")
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error='Send a JSON object.'), 400
+    data.setdefault('description', 'Cleaning supplies')
+    errors = _validate_record(data)
+    if errors:
+        return jsonify(error='Please check the expense details.', errors=errors), 400
     expenses = load_json(EXPENSES_FILE, [])
 
     expense = {
@@ -436,7 +501,7 @@ def monthly_report():
 
 
 def _report_totals(entries, expenses, config):
-    total_hours = sum(e["hours"] for e in entries)
+    total_hours = sum(record_minutes(e) for e in entries) / 60
     total_labour = sum(e["amount"] for e in entries)
     total_expenses = sum(e["amount"] for e in expenses)
     return {
@@ -502,7 +567,7 @@ def taxyear_report():
         ty_entries = []
         ty_expenses = []
 
-    total_hours = sum(e["hours"] for e in ty_entries)
+    total_hours = sum(record_minutes(e) for e in ty_entries) / 60
     total_labour = sum(e["amount"] for e in ty_entries)
     total_expenses_val = sum(e["amount"] for e in ty_expenses)
     total_miles = sum(e.get("miles", 0) for e in ty_entries)
@@ -514,8 +579,8 @@ def taxyear_report():
         d = datetime.fromisoformat(e["date"])
         key = f"{d.year}-{d.month:02d}"
         if key not in monthly:
-            monthly[key] = {"year": d.year, "month": d.month, "hours": 0, "labour": 0, "expenses": 0, "sessions": 0, "miles": 0}
-        monthly[key]["hours"] += e["hours"]
+            monthly[key] = {"year": d.year, "month": d.month, "minutes": 0, "labour": 0, "expenses": 0, "sessions": 0, "miles": 0}
+        monthly[key]["minutes"] += record_minutes(e)
         monthly[key]["labour"] += e["amount"]
         monthly[key]["sessions"] += 1
         monthly[key]["miles"] += e.get("miles", 0)
@@ -523,7 +588,7 @@ def taxyear_report():
         d = datetime.fromisoformat(e["date"])
         key = f"{d.year}-{d.month:02d}"
         if key not in monthly:
-            monthly[key] = {"year": d.year, "month": d.month, "hours": 0, "labour": 0, "expenses": 0, "sessions": 0, "miles": 0}
+            monthly[key] = {"year": d.year, "month": d.month, "minutes": 0, "labour": 0, "expenses": 0, "sessions": 0, "miles": 0}
         monthly[key]["expenses"] += e["amount"]
 
     breakdown = []
@@ -532,8 +597,8 @@ def taxyear_report():
         breakdown.append({
             "label": datetime(m["year"], m["month"], 1).strftime("%b %Y"),
             "sessions": m["sessions"],
-            "hours": round(m["hours"], 2),
-            "hours_fmt": format_hours(m["hours"]),
+            "hours": round(m["minutes"] / 60, 2),
+            "hours_fmt": format_hours(m["minutes"] / 60),
             "labour": round(m["labour"], 2),
             "expenses": round(m["expenses"], 2),
             "total": round(m["labour"] + m["expenses"], 2),

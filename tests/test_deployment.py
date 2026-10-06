@@ -72,6 +72,7 @@ if [[ ${FAIL_HEALTH:-0} == 1 && $(readlink "$TEST_APP/.runtime/current") != "$TE
 exit 0
 ''')
         self.command('sleep', 'exit 0\n')
+        self.command('cron', 'exit 0\n')
         # macOS lacks GNU mv's -T. Simulate that one OS primitive, using a real rename.
         self.command('mv', f'exec {sys.executable} -c \'import os,sys; os.replace(sys.argv[1],sys.argv[2])\' "$2" "$3"\n')
         self.env['TEST_APP'] = str(self.app)
@@ -96,6 +97,7 @@ source "$SCRIPT"
 APP_DIR="$TEST_APP"
 RUNTIME="$APP_DIR/.runtime"
 UNIT_FILE="$TEST_ROOT/service"
+CRON_FILE="$TEST_ROOT/backup-cron"
 preflight() { cd "$APP_DIR"; }
 ''' + overrides + '\nmain\n'
         return subprocess.run(['bash', '-c', harness], env=dict(self.env, SCRIPT=str(ROOT / script), **env),
@@ -105,6 +107,21 @@ preflight() { cd "$APP_DIR"; }
         self.assertEqual(self.git('-C', str(self.app), 'rev-parse', 'HEAD').stdout.strip(), self.old)
         self.assertEqual((self.runtime / 'current').resolve(), self.old_env)
         self.assertEqual((self.root / 'state').read_text().strip(), 'running')
+        self.assertEqual((self.app / 'data/entries.json').read_text(), '[{"id":"keep-me"}]')
+
+    def test_cron_configuration_failure_rolls_back_update(self):
+        self.new_release()
+        result = self.run_script(overrides='configure_backup_cron() { return 1; }')
+        self.assertNotEqual(result.returncode, 0)
+        self.assert_old_running()
+
+    def test_update_preserves_unmanaged_cron_file(self):
+        cron = self.root / 'backup-cron'
+        cron.write_text('# Owned by the administrator\n')
+        result = self.run_script()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(cron.read_text(), '# Owned by the administrator\n')
+        self.assert_old_running()
         self.assertEqual((self.app / 'data/entries.json').read_text(), '[{"id":"keep-me"}]')
 
     def test_successful_fast_forward_keeps_backup_and_old_environment(self):
@@ -182,7 +199,8 @@ preflight() { cd "$APP_DIR"; }
         result = self.run_script()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('Already up to date', result.stdout)
-        self.assertFalse((self.root / 'service.log').exists())
+        self.assertEqual((self.root / 'service.log').read_text().strip(), 'enable --now cron')
+        self.assertIn('15 2 * * * root', (self.root / 'backup-cron').read_text())
 
     def test_fetch_failure_does_not_stop_service(self):
         self.git('-C', str(self.app), 'remote', 'set-url', 'origin', str(self.root / 'missing'))
@@ -210,10 +228,14 @@ preflight() { cd "$APP_DIR"; }
         self.assertIn('ReadWritePaths=' + str(self.app / 'data'), content)
         self.assertEqual((self.app / 'data/entries.json').read_text(), '[{"id":"keep-me"}]')
         self.assertIn('enable cleaning-tracker.service', (self.root / 'service.log').read_text())
+        cron = self.root / 'backup-cron'
+        self.assertIn(f'/bin/bash "{self.app}/backup.sh" scheduled', cron.read_text())
+        self.assertEqual(cron.stat().st_mode & 0o777, 0o644)
         # Running the installer again is safe and does not reset saved data.
         result = self.run_script('install.sh')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual((self.app / 'data/entries.json').read_text(), '[{"id":"keep-me"}]')
+        self.assertEqual(cron.read_text().count('15 2 * * * root'), 1)
 
     def test_reinstall_failure_restores_previous_unit(self):
         self.prepare_install()

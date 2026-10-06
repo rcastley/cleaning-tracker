@@ -12,7 +12,7 @@ class EditTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
-        for name in ('ENTRIES_FILE', 'EXPENSES_FILE', 'CLIENTS_FILE'):
+        for name in ('ENTRIES_FILE', 'EXPENSES_FILE', 'CLIENTS_FILE', 'INVOICES_FILE'):
             patcher = patch.object(webapp, name, root / (name + '.json'))
             patcher.start()
             self.addCleanup(patcher.stop)

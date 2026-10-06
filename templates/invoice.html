@@ -210,8 +210,13 @@
 </head>
 <body>
     <div class="print-toolbar">
+        {% if issued %}
         <button type="button" onclick="window.print()">Print / Save PDF</button>
-        <p>Use your device’s print options to print or save a copy.</p>
+        <p>Issued invoice. This saved copy keeps its original details and dates.</p>
+        {% else %}
+        <form method="post"><button type="submit">Issue invoice</button></form>
+        <p>Review this draft. Issuing saves a fixed copy with a unique reference, ready to print or save as PDF.</p>
+        {% endif %}
     </div>
     <div class="header">
         <div class="invoice-title">INVOICE</div>

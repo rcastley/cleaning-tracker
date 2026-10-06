@@ -15,6 +15,7 @@ ENTRIES_FILE = DATA_DIR / "entries.json"
 CONFIG_FILE = DATA_DIR / "config.json"
 EXPENSES_FILE = DATA_DIR / "expenses.json"
 CLIENTS_FILE = DATA_DIR / "clients.json"
+INVOICES_FILE = DATA_DIR / "invoices.json"
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 # Ensure data directory exists
@@ -93,8 +94,8 @@ def get_client_names(clients):
 # Business logic
 # ---------------------------------------------------------------------------
 
-def calculate_hours(start_time, end_time):
-    """Calculate hours between two times, handling overnight shifts.
+def calculate_minutes(start_time, end_time):
+    """Calculate integer minutes between two times, handling overnight shifts.
 
     Accepts both ``datetime.time`` objects and ``"HH:MM"`` strings.
     """
@@ -112,28 +113,46 @@ def calculate_hours(start_time, end_time):
     else:
         diff_minutes = end_minutes - start_minutes
 
-    return diff_minutes / 60
+    return diff_minutes
+
+
+def calculate_hours(start_time, end_time):
+    return calculate_minutes(start_time, end_time) / 60
+
+
+def record_minutes(entry):
+    """Read exact duration, recovering legacy records from their clock times."""
+    if 'minutes' in entry:
+        return entry['minutes']
+    if 'start_time' in entry and 'end_time' in entry:
+        return calculate_minutes(entry['start_time'], entry['end_time'])
+    return round(entry['hours'] * 60)
 
 
 def get_tax_year(work_date, tax_year_start_month):
-    """Get the tax year for a given date (returns the year the tax year started)."""
-    if work_date.month >= tax_year_start_month:
+    """Return the starting year; April uses the UK 6 April boundary.
+
+    Other configured months retain their first-of-month boundary.
+    """
+    start_day = 6 if tax_year_start_month == 4 else 1
+    if (work_date.month, work_date.day) >= (tax_year_start_month, start_day):
         return work_date.year
     return work_date.year - 1
 
 
 def get_tax_year_label(tax_year, tax_year_start_month):
-    """Get a human-readable tax year label."""
-    start_month_name = datetime(2000, tax_year_start_month, 1).strftime("%B")
-    end_month = tax_year_start_month - 1 or 12
-    end_month_name = datetime(2000, end_month, 1).strftime("%B")
-    return f"{tax_year}/{tax_year + 1} ({start_month_name} {tax_year} - {end_month_name} {tax_year + 1})"
+    """Label the inclusive dates covered by the configured tax year."""
+    start_day = 6 if tax_year_start_month == 4 else 1
+    start = datetime(tax_year, tax_year_start_month, start_day)
+    end = datetime(tax_year + 1, tax_year_start_month, start_day) - timedelta(days=1)
+    years = str(tax_year) if start.year == end.year else f"{tax_year}/{end.year}"
+    return (f"{years} ({start.day} {start:%B %Y} - "
+            f"{end.day} {end:%B %Y})")
 
 
 def format_hours(hours):
     """Format hours as hours and minutes."""
-    h = int(hours)
-    m = int((hours - h) * 60)
+    h, m = divmod(round(hours * 60), 60)
     return f"{h}h {m}m"
 
 
@@ -157,9 +176,9 @@ def calculate_hmrc_mileage_allowance(total_miles):
 # Invoice
 # ---------------------------------------------------------------------------
 
-def generate_invoice_html(month_entries, month_expenses, selected_year, selected_month, config, client, *, start_date=None, end_date=None):
+def generate_invoice_html(month_entries, month_expenses, selected_year, selected_month, config, client, *, start_date=None, end_date=None, issued=None):
     """Generate a printable HTML invoice optimized for single A4 page."""
-    total_hours = sum(e["hours"] for e in month_entries)
+    total_hours = sum(record_minutes(e) for e in month_entries) / 60
     total_labour = sum(e["amount"] for e in month_entries)
     total_expenses = sum(e["amount"] for e in month_expenses)
     currency = config["currency_symbol"]
@@ -171,7 +190,7 @@ def generate_invoice_html(month_entries, month_expenses, selected_year, selected
                 "date": datetime.fromisoformat(e["date"]).strftime("%d/%m/%Y"),
                 "start_time": e["start_time"],
                 "end_time": e["end_time"],
-                "hours": e["hours"],
+                "hours": record_minutes(e) / 60,
                 "hourly_rate": e["hourly_rate"],
                 "amount": e["amount"],
             }
@@ -195,10 +214,10 @@ def generate_invoice_html(month_entries, month_expenses, selected_year, selected
     return template.render(
         config=Config(config),
         client=Config(client),
-        invoice_number=(f"{config['invoice_prefix']}-{start_date:%Y%m%d}-{end_date:%Y%m%d}"
-                        if start_date else generate_invoice_number(selected_year, selected_month, config)),
-        invoice_date=datetime.now().strftime("%d/%m/%Y"),
-        due_date=(datetime.now() + timedelta(days=config["payment_terms"])).strftime("%d/%m/%Y"),
+        issued=issued,
+        invoice_number=issued['number'] if issued else 'DRAFT',
+        invoice_date=issued['invoice_date'] if issued else 'Assigned when issued',
+        due_date=issued['due_date'] if issued else 'Assigned when issued',
         period_label=(f"{start_date:%d/%m/%Y} – {end_date:%d/%m/%Y}"
                       if start_date else datetime(selected_year, selected_month, 1).strftime("%B %Y")),
         currency=currency,

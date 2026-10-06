@@ -4,6 +4,7 @@
 SERVICE=cleaning-tracker.service
 SERVICE_USER=cleaning-tracker
 UNIT_FILE=/etc/systemd/system/cleaning-tracker.service
+CRON_FILE=/etc/cron.d/cleaning-tracker-backup
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 RUNTIME="$APP_DIR/.runtime"
 ROLLBACK_NEEDED=0
@@ -74,6 +75,28 @@ backup_data() {
     printf '%s\n' "$OLD_COMMIT" > "$BACKUP.commit"
     chmod 600 "$BACKUP" "$BACKUP.commit"
     echo "Data backup: $BACKUP"
+}
+
+configure_backup_cron() {
+    if [[ -f "$CRON_FILE" ]]; then
+        grep -qx '# Managed by Cleaning Tracker install.sh' "$CRON_FILE" || die "Existing backup cron file is not managed by this installer."
+    fi
+    if ! command -v cron >/dev/null; then
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y cron
+    fi
+    systemctl enable --now cron
+    install -d -m 755 "$RUNTIME"
+    cat > "$RUNTIME/backup-cron.next" <<EOF
+# Managed by Cleaning Tracker install.sh
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Daily at 02:15 in the container timezone; keep 30 scheduled snapshots.
+15 2 * * * root /bin/bash "$APP_DIR/backup.sh" scheduled 2>&1 | /usr/bin/logger -t cleaning-tracker-backup
+EOF
+    install -m 644 "$RUNTIME/backup-cron.next" "${CRON_FILE}.next"
+    mv -Tf "${CRON_FILE}.next" "$CRON_FILE"
+    echo "Daily backups configured for 02:15 (container timezone); last 30 scheduled backups retained."
 }
 
 healthy() {

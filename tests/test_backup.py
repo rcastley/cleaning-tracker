@@ -15,7 +15,7 @@ class BackupTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
-        for name in ('ENTRIES_FILE', 'EXPENSES_FILE', 'CLIENTS_FILE', 'CONFIG_FILE'):
+        for name in ('ENTRIES_FILE', 'EXPENSES_FILE', 'CLIENTS_FILE', 'CONFIG_FILE', 'INVOICES_FILE'):
             patcher = patch.object(webapp, name, self.root / name)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -31,6 +31,7 @@ class BackupTests(unittest.TestCase):
             'expenses.json': [{'id': 'expense', 'client_id': 'a', 'amount': 3.49, 'description': 'Cloths £3.49'}],
             'clients.json': [{'id': 'a', 'name': 'Zoë', 'address': 'Saved address'}],
             'config.json': self.config,
+            'invoices.json': [{'id': 'issued', 'html': '<html>Saved invoice</html>'}],
         }
         for filename, value in expected.items():
             save_json(getattr(webapp, filename.split('.')[0].upper() + '_FILE'), value)

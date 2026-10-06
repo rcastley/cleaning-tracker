@@ -24,6 +24,7 @@ main() {
     repo_git merge-base --is-ancestor HEAD "$upstream" || die "Local branch is ahead of or diverged from $upstream. Resolve it manually."
     [[ -z "$(repo_git ls-tree -r --name-only "$target" -- data .runtime backups)" ]] || die "New release attempts to track deployment data."
     if [[ "$OLD_COMMIT" == "$target" ]]; then
+        configure_backup_cron
         echo "Already up to date. Service was not restarted."
         return
     fi
@@ -44,6 +45,7 @@ main() {
     systemctl reset-failed "$SERVICE" 2>/dev/null || true
     systemctl start "$SERVICE"
     healthy || die "Updated app failed its startup check."
+    configure_backup_cron
     ROLLBACK_NEEDED=0
     echo "Updated to $(repo_git rev-parse --short HEAD). Service is healthy."
     echo "Previous environment retained at $OLD_ENV; backup at $BACKUP."

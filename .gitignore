@@ -8,3 +8,6 @@ gunicorn.log
 .claude
 node_modules/
 .runtime/
+
+# Runtime lock used when issuing invoices
+data/invoices.lock

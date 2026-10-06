@@ -359,7 +359,7 @@
               <strong class="history-amount" x-text="config.currency_symbol + e.amount.toFixed(2)"></strong>
             </div>
             <div class="history-card-footer">
-              <p class="min-width-zero" x-text="historyMode === 'work' ? e.start_time + '–' + e.end_time + ' · ' + fmtHours(e.hours) + ((e.miles || 0) > 0 ? ' · ' + e.miles + ' mi' : '') : (e.description || 'Expense')"></p>
+              <p class="min-width-zero" x-text="historyMode === 'work' ? e.start_time + '–' + e.end_time + ' · ' + fmtHours(entryHours(e)) + ((e.miles || 0) > 0 ? ' · ' + e.miles + ' mi' : '') : (e.description || 'Expense')"></p>
               <div class="d-flex gap-2 flex-shrink-0">
                 <button @click="openEditor(historyMode === 'work' ? 'work' : 'expense', e, $event.currentTarget)" :aria-label="'Edit ' + (historyMode === 'work' ? 'work entry' : 'expense') + ' for ' + clientName(e.client_id) + ' on ' + fullDate(e.date)" title="Edit entry" class="btn icon-button edit-button"><span class="icon fs-5" x-html="icons.edit"></span></button>
                 <button @click="historyMode === 'work' ? deleteEntry(e.id) : deleteExpense(e.id)" :aria-label="'Delete ' + (historyMode === 'work' ? 'work entry' : 'expense') + ' for ' + clientName(e.client_id) + ' on ' + fullDate(e.date)" title="Delete entry" class="btn icon-button delete-button"><span class="icon fs-5" x-html="icons.delete"></span></button>
@@ -408,7 +408,7 @@
               <select id="field-config-tax_year_start_month" x-model.number="config.tax_year_start_month"
                 class="form-select w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6 bg-white">
                 <template x-for="(name, i) in monthNames" :key="i">
-                  <option :value="i + 1" x-text="name"></option>
+                  <option :value="i + 1" x-text="i === 3 ? '6 April (UK)' : '1 ' + name"></option>
                 </template>
               </select>
             </div>

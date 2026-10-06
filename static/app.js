@@ -107,7 +107,7 @@ function app() {
       if (this.rangeLoading || this.reportLoading) return 'Your report is loading…';
       if (this.reportError || (this.reportMode === 'range' && !this.rangeReady)) return 'Choose a valid period and load your report first.';
       if (!this.canInvoice) return 'No work or expenses to invoice for this period.';
-      return 'Opens a preview with a Print / Save PDF button.';
+      return 'Review and issue a draft, or reprint the saved invoice.';
     },
     fullDate(iso) {
       if (!iso) return '';
@@ -248,10 +248,7 @@ function app() {
     monthNames: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
 
     get previewHours() {
-      const h = this.calcHours(this.workStart, this.workEnd);
-      const hr = Math.floor(h);
-      const mn = Math.round((h - hr) * 60);
-      return hr + 'h ' + mn + 'm';
+      return this.fmtHours(this.calcHours(this.workStart, this.workEnd));
     },
     get previewAmount() {
       return (this.calcHours(this.workStart, this.workEnd) * (this.config.hourly_rate || 0)).toFixed(2);
@@ -569,9 +566,16 @@ function app() {
     },
 
     fmtHours(h) {
-      const hr = Math.floor(h);
-      const mn = Math.round((h - hr) * 60);
+      const minutes = Math.round(h * 60);
+      const hr = Math.floor(minutes / 60);
+      const mn = minutes % 60;
       return hr + 'h ' + mn + 'm';
+    },
+
+    entryHours(entry) {
+      if (entry.minutes != null) return entry.minutes / 60;
+      if (entry.start_time && entry.end_time) return this.calcHours(entry.start_time, entry.end_time);
+      return entry.hours;
     },
 
     clientName(id) {

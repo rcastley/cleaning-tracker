@@ -52,6 +52,7 @@ main() {
     systemctl enable "$SERVICE"
     systemctl restart "$SERVICE"
     healthy || die "Startup check failed. See journalctl -u $SERVICE -n 80."
+    configure_backup_cron
     ROLLBACK_NEEDED=0
     echo "Installed and running on port 5001. The app will start when this LXC starts."
     echo "Also enable Start at boot in Proxmox if the LXC should start with its host."
