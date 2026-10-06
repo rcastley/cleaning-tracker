@@ -41,7 +41,7 @@ main() {
     [[ -z "$(repo_git ls-files data .runtime backups)" ]] || die "New release attempts to track deployment data."
     build_environment
     activate_environment
-    systemctl reset-failed "$SERVICE"
+    systemctl reset-failed "$SERVICE" 2>/dev/null || true
     systemctl start "$SERVICE"
     healthy || die "Updated app failed its startup check."
     ROLLBACK_NEEDED=0

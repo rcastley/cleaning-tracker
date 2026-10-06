@@ -48,7 +48,10 @@ case "$1" in
  is-active) test "$(cat "$TEST_ROOT/state")" = running ;;
  cat) test -f "$TEST_ROOT/service" ;;
  stop) echo stopped > "$TEST_ROOT/state" ;;
- start|restart) echo running > "$TEST_ROOT/state" ;;
+ start|restart)
+   if [[ ${FAIL_START:-0} == 1 && $(readlink "$TEST_APP/.runtime/current") != "$TEST_APP/.runtime/venv-old" ]]; then exit 1; fi
+   echo running > "$TEST_ROOT/state" ;;
+ reset-failed) test "${FAIL_RESET:-0}" != 1 ;;
  *) exit 0 ;;
 esac
 ''')
@@ -132,6 +135,13 @@ preflight() { cd "$APP_DIR"; }
         self.assertNotEqual(result.returncode, 0)
         self.assert_old_running()
 
+    def test_start_failure_still_triggers_recovery(self):
+        self.new_release()
+        result = self.run_script(FAIL_START='1', FAIL_RESET='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Previous version is running again', result.stderr)
+        self.assert_old_running()
+
     def test_backup_failure_does_not_change_code(self):
         self.new_release()
         result = self.run_script(overrides='backup_data() { return 1; }')
@@ -190,7 +200,8 @@ preflight() { cd "$APP_DIR"; }
         self.prepare_install()
         self.unit.unlink()
         (self.runtime / 'current').unlink()
-        result = self.run_script('install.sh')
+        # systemd can reject reset-failed before a new unit is loaded.
+        result = self.run_script('install.sh', FAIL_RESET='1')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         content = self.unit.read_text()
         self.assertIn('--workers 1', content)

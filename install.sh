@@ -46,7 +46,9 @@ main() {
     RESTORE_UNIT=1
     write_unit
     systemctl daemon-reload
-    systemctl reset-failed "$SERVICE"
+    # A new unit may not be loaded yet. Clearing an old failure is best-effort;
+    # enable/restart and the health check below remain mandatory.
+    systemctl reset-failed "$SERVICE" 2>/dev/null || true
     systemctl enable "$SERVICE"
     systemctl restart "$SERVICE"
     healthy || die "Startup check failed. See journalctl -u $SERVICE -n 80."

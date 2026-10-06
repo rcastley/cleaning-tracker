@@ -115,7 +115,7 @@ recover_on_exit() {
         systemctl daemon-reload || recovered=0
     fi
     if [[ -n "$OLD_ENV" && $recovered == 1 ]]; then
-        systemctl reset-failed "$SERVICE"
+        systemctl reset-failed "$SERVICE" 2>/dev/null || true
         if systemctl start "$SERVICE" && healthy; then
             echo "Previous version is running again." >&2
         else
