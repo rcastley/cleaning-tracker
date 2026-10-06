@@ -5,7 +5,7 @@ A mobile-first Flask web app to track hours worked on cleaning jobs, log expense
 ## Stack
 
 - **Backend**: Flask + Gunicorn, JSON file storage (no database)
-- **Frontend**: Alpine.js + Tailwind CSS (precompiled), inline SVG icons, no build step at runtime
+- **Frontend**: Alpine.js + Bootstrap 5.3.8 (self-hosted), inline SVG icons, no build step at runtime
 - **Compression**: gzip via `flask-compress`; static assets cached for 1 hour
 
 ## Features
@@ -21,19 +21,94 @@ A mobile-first Flask web app to track hours worked on cleaning jobs, log expense
 
 ## Installation
 
-Requires Python 3.10+ and Node.js (for the one-time CSS build).
+Requires Python 3.10+. No Node.js, npm install, or CSS build is needed.
 
 ```bash
 # 1. Create a virtualenv and install Python deps
 uv venv .venv               # or: python -m venv .venv
 uv pip install -r requirements.txt   # or: .venv/bin/pip install -r requirements.txt
-
-# 2. Build the Tailwind stylesheet (committed; only needed when classes change)
-npm install
-npm run build:css
 ```
 
-## Running
+## Proxmox LXC installation and updates
+
+Use a Debian 12+ or Ubuntu 22.04+ LXC with systemd and Python 3.10+. Run the
+following **inside the LXC as root**. For a new installation:
+
+```bash
+apt-get update
+apt-get install -y git
+git clone https://github.com/rcastley/cleaning-tracker.git /opt/cleaning-tracker
+cd /opt/cleaning-tracker
+./install.sh
+```
+
+For an existing installation, keep the existing checkout and its `data/` directory
+together. Stop the manually started app with `./start.sh stop` before installing
+the service. If the checkout is under `/root` or `/home`, move it to an unused path
+under `/opt` or `/srv` first. The installer deliberately refuses those private home
+locations rather than changing their permissions. Do not clone over existing data.
+The Git checkout must be clean, including untracked files; `.venv/`, `.runtime/`,
+`data/*.json`, and `backups/` are ignored and preserved.
+
+`install.sh` installs OS/Python dependencies, creates a dedicated `cleaning-tracker`
+system account, backs up existing data, and installs/enables
+`cleaning-tracker.service`. Gunicorn runs in the foreground with one worker, restarts
+after a crash, and writes logs to the journal. The service can write only to the
+app's `data/` directory (plus its private temporary directory). The installer can
+be rerun; it does not reset entries, clients, expenses, or settings. It refuses to
+replace an unrelated systemd unit or one with custom overrides.
+
+The app listens on port **5001**, preserving the existing reverse-proxy setup.
+Installation does not configure authentication, TLS, the firewall, or a reverse
+proxy. In Proxmox, also enable **Container → Options → Start at boot** to start the
+LXC after the host reboots; systemd starts the app whenever the LXC starts.
+
+```bash
+systemctl status cleaning-tracker
+systemctl restart cleaning-tracker
+journalctl -u cleaning-tracker -f
+```
+
+For later updates:
+
+```bash
+cd /opt/cleaning-tracker
+./update.sh
+```
+
+The updater uses the current branch's configured upstream. Git access must work for
+the account running the script (root); private repositories need that account's
+credentials. It fetches while the app is still running and refuses dirty, detached,
+locally ahead, or divergent checkouts. If no new commit exists it leaves the service
+alone. Otherwise it:
+
+1. Stops the service and creates a private `backups/pre-deploy-*.tar.gz` snapshot,
+   with the previous commit recorded alongside it.
+2. Runs `git pull --ff-only --no-rebase . <fetched-commit>` to apply the exact remote
+   revision already fetched and checked. Using the local fetched commit avoids a
+   second remote fetch introducing an unchecked revision.
+3. Creates a fresh Python environment under `.runtime/`, installs requirements,
+   and checks dependency compatibility.
+4. Switches the environment, starts the service, and checks both the main page and
+   `/api/bootstrap` over localhost.
+5. On failure, restores the previous commit and environment and tries to restart
+   the previous app. The command still exits with an error and reports recovery
+   status. Failed first-time installations leave the service stopped for repair.
+
+Data is never automatically rolled back, since doing so could discard new records.
+These scripts perform no data migrations. A future release that changes the data
+format needs a separately reviewed migration/recovery procedure. Backups and old
+environments are retained for recovery; review disk usage and remove old copies
+only after confirming a successful deployment. Do not manually edit the checkout
+or run `start.sh` while a deployment is in progress. Updates keep the installed unit;
+rerun `install.sh` when a release requires changes to its systemd configuration.
+
+Deployment tests use real temporary Git repositories, backups, and symlinks, with
+systemd, package installation, and HTTP responses simulated. Run them with
+`.venv/bin/python -m unittest discover -s tests -p test_deployment.py`.
+The first real installation must still be validated inside the target LXC.
+
+## Running locally
 
 ```bash
 ./start.sh           # start gunicorn in the background on port 5001
@@ -44,11 +119,10 @@ npm run build:css
 
 Then open `http://localhost:5001`.
 
-For development with hot CSS reloading:
+For development, edit `static/app.css` directly and refresh the browser:
 
 ```bash
-npm run watch:css     # in one terminal
-.venv/bin/python webapp.py    # in another (Flask dev server on :5001)
+.venv/bin/python webapp.py    # Flask dev server on :5001
 ```
 
 ## Data storage
@@ -80,16 +154,17 @@ templates/
   index.html           Single-page app shell
   invoice.html         Printable invoice template
 static/
-  tailwind.css         Built stylesheet (commit; rebuild via npm run build:css)
+  app.css              App styles; edit directly, no build step
+  vendor/bootstrap.min.css Bootstrap 5.3.8 compiled CSS (MIT)
   app.js               Alpine app code + icon SVGs
   favicon.svg          App icon
   vendor/alpine.min.js Alpine.js 3.14.9 (self-hosted)
-  src/input.css        Tailwind entry point
 data/                  JSON data files (gitignored)
-tailwind.config.js     Tailwind content-scanning config
-package.json           CSS build scripts
 requirements.txt       Python deps
 start.sh               Gunicorn process manager
+install.sh             LXC installation and systemd setup
+update.sh              Fast-forward update, backup, health check and rollback
+scripts/service-common.sh Shared deployment functions
 backup.sh              Data backup script
 ```
 
@@ -174,3 +249,5 @@ There is no in-app restore button. To restore, stop the app, preserve the curren
 `data/` folder, extract the four data JSON files into `data/`, then restart.
 Restoration replaces existing data; it does not merge records. The existing
 server-side `backup.sh` remains available.
+
+Bootstrap CSS is vendored from https://getbootstrap.com/ (5.3.8). Alpine handles interactions, so Bootstrap JavaScript is not required. The standalone invoice retains its print-specific CSS. Existing `.cjs` interaction tests optionally use Node’s built-in test utilities; they require no npm dependencies and are not part of installation or deployment.

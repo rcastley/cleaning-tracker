@@ -7,3 +7,4 @@ gunicorn.pid
 gunicorn.log
 .claude
 node_modules/
+.runtime/

@@ -70,7 +70,7 @@ def _filter_by_dates(items, start, end):
 def index():
     # Keep markup and assets in sync after deployment, even with browser caching.
     versions = {name: hashlib.sha256((Path(app.static_folder) / name).read_bytes()).hexdigest()[:12]
-                for name in ("app.js", "tailwind.css")}
+                for name in ("app.js", "app.css", "vendor/bootstrap.min.css")}
     return render_template("index.html", asset_versions=versions)
 
 

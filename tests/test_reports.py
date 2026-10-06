@@ -33,7 +33,7 @@ class ReportTests(unittest.TestCase):
         import hashlib
         from pathlib import Path
         html = self.client.get('/').get_data(as_text=True)
-        for name in ('app.js', 'tailwind.css'):
+        for name in ('app.js', 'app.css', 'vendor/bootstrap.min.css'):
             version = hashlib.sha256((Path(webapp.app.static_folder) / name).read_bytes()).hexdigest()[:12]
             self.assertIn(name + '?v=' + version, html)
 

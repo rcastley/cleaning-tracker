@@ -8,175 +8,157 @@
   <title>Cleaning Tracker</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css', v=asset_versions['tailwind.css']) }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css', v=asset_versions['vendor/bootstrap.min.css']) }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v=asset_versions['app.css']) }}">
   <script defer src="{{ url_for('static', filename='app.js', v=asset_versions['app.js']) }}"></script>
   <script defer src="{{ url_for('static', filename='vendor/alpine.min.js') }}"></script>
-  <style>
-    [x-cloak] { display: none !important; }
-    .icon { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; line-height: 1; }
-    input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(30%); }
-    /* Neutralise iOS native input chrome that breaks width calculations */
-    input, select, textarea { box-sizing: border-box; max-width: 100%; -webkit-appearance: none; appearance: none; }
-    html, body { overscroll-behavior: none; }
-    html { height: 100%; overflow: hidden; }
-    body { height: 100%; overflow-y: auto; }
-    body.dialog-open { overflow: hidden; }
-    /* Safe area insets for notch/Dynamic Island and home indicator */
-    .safe-top { padding-top: env(safe-area-inset-top); }
-    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-  </style>
+
 </head>
-<body class="bg-gray-50 pb-24 md:pb-4 md:pt-16" x-data="app()" x-cloak>
+<body class="app-shell" x-data="app()" x-cloak>
 
   <!-- ===== DESKTOP TOP NAV ===== -->
-  <nav :inert="editor.open || deleteConfirm.show" aria-label="Main navigation" class="hidden md:flex fixed top-0 inset-x-0 bg-white border-b border-gray-200 z-40 items-center px-6 h-14">
-    <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="28" height="28" class="shrink-0 w-7 h-7 mr-2">
-    <span class="font-bold text-blue-600 text-lg mr-8 whitespace-nowrap">Cleaning Tracker</span>
+  <nav :inert="editor.open || deleteConfirm.show" aria-label="Main navigation" class="desktop-nav d-none d-md-flex">
+    <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="28" height="28" class="flex-shrink-0 brand-large me-2">
+    <span class="fw-bold text-primary lead-size me-4 text-nowrap">Cleaning Tracker</span>
     <template x-for="t in tabs" :key="t.id">
-      <button @click="tab = t.id; onTabSwitch(t.id)" :aria-current="tab === t.id ? 'page' : null" :class="tab === t.id ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'"
-        class="px-4 h-14 font-medium text-sm transition-colors" x-text="t.label"></button>
+      <button @click="tab = t.id; onTabSwitch(t.id)" :aria-current="tab === t.id ? 'page' : null" :class="tab === t.id ? 'is-active' : ''"
+        class="btn nav-tab" x-text="t.label"></button>
     </template>
-    <span class="ml-auto text-sm text-gray-400" x-text="config.business_name"></span>
+    <span class="nav-business ms-auto" x-text="config.business_name"></span>
   </nav>
 
   <!-- ===== MOBILE HEADER ===== -->
-  <header class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200 px-4 h-12 flex items-center justify-between gap-2 safe-top">
-    <div class="flex items-center gap-2 min-w-0">
-      <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="24" height="24" class="shrink-0 w-6 h-6">
-      <span class="font-bold text-blue-600 whitespace-nowrap">Cleaning Tracker</span>
+  <header class="app-header d-md-none safe-top">
+    <div class="d-flex align-items-center gap-2 min-width-zero">
+      <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="24" height="24" class="flex-shrink-0 brand-small">
+      <div class="header-identity"><span>Cleaning Tracker</span><small x-text="config.business_name"></small></div>
     </div>
-    <span class="text-xs text-gray-400 truncate" x-text="config.business_name"></span>
   </header>
 
   <!-- ===== TOAST ===== -->
-  <div x-show="toast.show" x-transition:enter="transition ease-out duration-200" x-transition:leave="transition ease-in duration-150"
-    class="fixed top-20 md:top-16 inset-x-4 md:inset-x-auto md:right-6 md:w-80 z-50 rounded-lg shadow-lg px-4 py-3 text-sm font-medium text-white safe-top"
-    :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'" role="status" aria-live="polite" x-text="toast.msg">
+  <div x-show="toast.show" x-transition.opacity.duration.200ms
+    class="position-fixed toast-top toast-inset app-toast dialog-layer rounded-3 shadow-lg px-3 py-2 small fw-medium text-white safe-top"
+    :class="toast.type === 'success' ? 'bg-success' : 'bg-danger'" role="status" aria-live="polite" x-text="toast.msg">
   </div>
 
   <!-- ===== MAIN CONTENT ===== -->
-  <main :inert="editor.open || deleteConfirm.show" class="max-w-2xl mx-auto px-4 pt-4">
+  <main :inert="editor.open || deleteConfirm.show" class="app-main">
 
     <div class="page-heading">
       <h1 x-text="pageTitle"></h1>
       <p x-text="pageDescription"></p>
     </div>
-    <div x-show="bootLoading" role="status" class="notice">Loading your data…</div>
-    <div x-show="bootError" role="alert" class="notice notice-error">
-      <p x-text="bootError"></p><button class="secondary-button mt-2" @click="init()">Try again</button>
+    <div x-show="bootLoading" role="status" class="alert alert-primary">Loading your data…</div>
+    <div x-show="bootError" role="alert" class="alert alert-primary alert-danger">
+      <p x-text="bootError"></p><button class="btn btn-outline-secondary mt-2" @click="init()">Try again</button>
     </div>
     <div x-show="!bootLoading && !bootError">
     <!-- =========== LOG TAB =========== -->
-    <section x-show="tab === 'log'">
+    <section x-show="tab === 'log'" class="log-view">
+      <div class="entry-controls">
       <!-- Work / Expense toggle -->
-      <div class="segmented mb-4">
-        <button @click="logMode = 'work'; logError = ''" :aria-pressed="logMode === 'work'" :class="logMode === 'work' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
-          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Work</button>
-        <button @click="logMode = 'expense'; logError = ''" :aria-pressed="logMode === 'expense'" :class="logMode === 'expense' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
-          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Expense</button>
+      <div class="segmented mb-3">
+        <button @click="logMode = 'work'; logError = ''" :aria-pressed="logMode === 'work'" :class="logMode === 'work' ? 'is-active' : ''"
+          class="btn segment-button">Work</button>
+        <button @click="logMode = 'expense'; logError = ''" :aria-pressed="logMode === 'expense'" :class="logMode === 'expense' ? 'is-active' : ''"
+          class="btn segment-button">Expense</button>
       </div>
 
-      <div x-show="lastSaved" class="notice notice-success" role="status">
-        <div class="flex items-start justify-between gap-3">
-          <div><strong>Saved successfully</strong><p x-text="lastSaved ? clientName(lastSaved.client_id) + ' · ' + fullDate(lastSaved.date) + ' · ' + config.currency_symbol + lastSaved.amount.toFixed(2) : ''"></p></div>
-          <button class="text-blue-700 font-semibold shrink-0" @click="viewSaved()">View entry</button>
-        </div>
-      </div>
       <!-- Client selector -->
-      <div class="mb-4">
+      <div class="mb-3">
         <label for="log-client" class="field-label">Client</label>
         <select id="log-client" x-model="logClientId" @change="updateMilesFromClient()"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+          class="form-select w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6 bg-white">
           <template x-for="c in clients" :key="c.id">
             <option :value="c.id" x-text="c.name"></option>
           </template>
         </select>
       </div>
 
-      <div class="flex gap-2 mb-3" aria-label="Entry date shortcuts">
-        <button class="date-chip" @click="setLogDate(0)">Today</button>
-        <button class="date-chip" @click="setLogDate(-1)">Yesterday</button>
+      </div>
+      <div x-show="lastSaved" class="alert alert-primary alert-success" role="status">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+          <div><strong>Saved successfully</strong><p x-text="lastSaved ? clientName(lastSaved.client_id) + ' · ' + fullDate(lastSaved.date) + ' · ' + config.currency_symbol + lastSaved.amount.toFixed(2) : ''"></p></div>
+          <button class="btn text-primary-emphasis fw-semibold flex-shrink-0" @click="viewSaved()">View entry</button>
+        </div>
       </div>
       <!-- === WORK FORM === -->
-      <form x-show="logMode === 'work'" @submit.prevent="saveWork()" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+      <form x-show="logMode === 'work'" @submit.prevent="saveWork()" class="entry-form work-entry-form stack-large">
         <div>
-          <label for="field-workDate" class="block text-xs font-medium text-gray-500 mb-1">Date</label>
-          <input id="field-workDate" type="date" required x-model="workDate" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          <label for="field-workDate" class="d-block caption fw-medium text-secondary mb-1">Date</label>
+          <input id="field-workDate" type="date" required x-model="workDate" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="work-times d-grid columns-two gap-3">
           <div>
-            <label for="field-workStart" class="block text-xs font-medium text-gray-500 mb-1">Start</label>
-            <input id="field-workStart" type="time" required x-model="workStart" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <label for="field-workStart" class="d-block caption fw-medium text-secondary mb-1">Start</label>
+            <input id="field-workStart" type="time" required x-model="workStart" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
           </div>
           <div>
-            <label for="field-workEnd" class="block text-xs font-medium text-gray-500 mb-1">End</label>
-            <input id="field-workEnd" type="time" required x-model="workEnd" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <label for="field-workEnd" class="d-block caption fw-medium text-secondary mb-1">End</label>
+            <input id="field-workEnd" type="time" required x-model="workEnd" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
           </div>
         </div>
         <div>
-          <label for="field-workMiles" class="block text-xs font-medium text-gray-500 mb-1">Miles (round trip)</label>
+          <label for="field-workMiles" class="d-block caption fw-medium text-secondary mb-1">Miles (round trip)</label>
           <input id="field-workMiles" type="number" step="0.1" min="0" inputmode="decimal" required x-model.number="workMiles"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
         </div>
-        <p x-show="workStart && workEnd && workEnd < workStart" class="text-sm text-blue-700">Overnight work: end time is on the following day.</p>
+        <p x-show="workStart && workEnd && workEnd < workStart" class="entry-message small text-primary-emphasis">Overnight work: end time is on the following day.</p>
         <!-- Live preview -->
-        <div class="text-center py-2 bg-blue-50 rounded-lg">
-          <span class="text-lg font-bold text-blue-700" x-text="previewHours"></span>
-          <span class="text-gray-500 mx-1">@</span>
-          <span class="text-gray-600" x-text="config.currency_symbol + (config.hourly_rate ?? 0).toFixed(2)"></span>
-          <span class="text-gray-500 mx-1">=</span>
-          <span class="text-lg font-bold text-emerald-600" x-text="config.currency_symbol + previewAmount"></span>
+        <div class="entry-estimate" aria-live="polite">
+          <div><span class="estimate-label">Entry total</span><p><span x-text="previewHours"></span> at <span x-text="config.currency_symbol + (config.hourly_rate ?? 0).toFixed(2)"></span> / hr</p></div>
+          <strong x-text="config.currency_symbol + previewAmount"></strong>
         </div>
-        <p x-show="logError" x-text="logError" role="alert" class="notice notice-error"></p>
+        <p x-show="logError" x-text="logError" role="alert" class="entry-message alert alert-primary alert-danger"></p>
         <button type="submit" :disabled="saving"
-          class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-all">
+          class="btn w-100 btn-primary text-white fw-semibold py-2 rounded-3 fs-6">
           <span x-text="saving ? 'Saving…' : 'Save work entry'"></span>
         </button>
       </form>
 
       <!-- === EXPENSE FORM === -->
-      <form x-show="logMode === 'expense'" @submit.prevent="saveExpense()" class="bg-white rounded-lg shadow-sm p-4 space-y-4">
-        <div class="grid grid-cols-2 gap-3">
+      <form x-show="logMode === 'expense'" @submit.prevent="saveExpense()" class="entry-form expense-entry-form stack-large">
+        <div class="expense-date-amount d-grid columns-two gap-3">
           <div>
-            <label for="field-expDate" class="block text-xs font-medium text-gray-500 mb-1">Date</label>
-            <input id="field-expDate" type="date" required x-model="expDate" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <label for="field-expDate" class="d-block caption fw-medium text-secondary mb-1">Date</label>
+            <input id="field-expDate" type="date" required x-model="expDate" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
           </div>
           <div>
-            <label for="field-expAmount" class="block text-xs font-medium text-gray-500 mb-1">Amount</label>
+            <label for="field-expAmount" class="d-block caption fw-medium text-secondary mb-1">Amount</label>
             <input id="field-expAmount" type="number" step="0.01" min="0.01" inputmode="decimal" required x-model.number="expAmount" placeholder="0.00"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
           </div>
         </div>
         <div>
-          <label for="field-expDesc" class="block text-xs font-medium text-gray-500 mb-1">Description</label>
+          <label for="field-expDesc" class="d-block caption fw-medium text-secondary mb-1">Description</label>
           <input id="field-expDesc" type="text" x-model="expDesc"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
         </div>
-        <p x-show="logError" x-text="logError" role="alert" class="notice notice-error"></p>
+        <p x-show="logError" x-text="logError" role="alert" class="entry-message alert alert-primary alert-danger"></p>
         <button type="submit" :disabled="saving || expAmount <= 0"
-          class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-all">
+          class="btn w-100 btn-primary text-white fw-semibold py-2 rounded-3 fs-6">
           <span x-text="saving ? 'Saving…' : 'Save expense'"></span>
         </button>
       </form>
     </section>
 
     <!-- =========== REPORTS TAB =========== -->
-    <section x-show="tab === 'reports'">
+    <section x-show="tab === 'reports'" class="reports-view">
       <!-- Report period -->
-      <div class="segmented mb-4">
-        <button @click="reportMode = 'monthly'; loadMonthly()" :aria-pressed="reportMode === 'monthly'" :class="reportMode === 'monthly' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
-          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Monthly</button>
-        <button @click="reportMode = 'range'; loadRange()" :aria-pressed="reportMode === 'range'" :class="reportMode === 'range' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
-          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Custom dates</button>
-        <button @click="reportMode = 'taxyear'; loadTaxYear()" :aria-pressed="reportMode === 'taxyear'" :class="reportMode === 'taxyear' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
-          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Tax Year</button>
+      <div class="segmented mb-3">
+        <button @click="reportMode = 'monthly'; loadMonthly()" :aria-pressed="reportMode === 'monthly'" :class="reportMode === 'monthly' ? 'is-active' : ''"
+          class="btn segment-button">Monthly</button>
+        <button @click="reportMode = 'range'; loadRange()" :aria-pressed="reportMode === 'range'" :class="reportMode === 'range' ? 'is-active' : ''"
+          class="btn segment-button">Custom dates</button>
+        <button @click="reportMode = 'taxyear'; loadTaxYear()" :aria-pressed="reportMode === 'taxyear'" :class="reportMode === 'taxyear' ? 'is-active' : ''"
+          class="btn segment-button">Tax Year</button>
       </div>
 
       <!-- Client filter -->
-      <div x-show="clients.length > 1" class="mb-4">
+      <div x-show="clients.length > 1" class="mb-3">
         <label for="report-client" class="field-label">Client</label>
         <select id="report-client" x-model="reportClientId" @change="loadReport()"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+          class="form-select w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6 bg-white">
           <option value="">All Clients</option>
           <template x-for="c in clients" :key="c.id">
             <option :value="c.id" x-text="c.name"></option>
@@ -188,45 +170,45 @@
       <div x-show="reportMode !== 'taxyear'">
         <label x-show="reportMode === 'monthly'" for="report-month" class="field-label">Month</label>
         <select id="report-month" x-show="reportMode === 'monthly'" x-model="selectedMonth" @change="loadMonthly()"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white mb-4 focus:ring-2 focus:ring-blue-500">
+          class="form-select w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6 bg-white mb-3">
           <template x-for="m in monthlyData.available_months" :key="m.year + '-' + m.month">
             <option :value="m.year + '-' + m.month" x-text="m.label"></option>
           </template>
         </select>
 
-        <div x-show="reportMode === 'range'" class="mb-4">
-          <div class="flex flex-wrap gap-2 mb-3" aria-label="Report date shortcuts">
-            <button type="button" class="date-chip" @click="setRangePreset('week')">This week</button>
-            <button type="button" class="date-chip" @click="setRangePreset('month')">This month</button>
-            <button type="button" class="date-chip" @click="setRangePreset('lastmonth')">Last month</button>
+        <div x-show="reportMode === 'range'" class="mb-3">
+          <div class="d-flex flex-wrap gap-2 mb-2" aria-label="Report date shortcuts">
+            <button type="button" class="btn btn-outline-primary date-chip" @click="setRangePreset('week')">This week</button>
+            <button type="button" class="btn btn-outline-primary date-chip" @click="setRangePreset('month')">This month</button>
+            <button type="button" class="btn btn-outline-primary date-chip" @click="setRangePreset('lastmonth')">Last month</button>
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="min-w-0">
-              <label for="report-start" class="block text-sm font-medium text-gray-700 mb-1">Start date</label>
+          <div class="d-grid columns-two gap-3">
+            <div class="min-width-zero">
+              <label for="report-start" class="d-block small fw-medium text-body-secondary mb-1">Start date</label>
               <input id="report-start" type="date" x-model="rangeStart" @change="loadRange()" :max="rangeEnd || '9999-12-31'" required
-                aria-describedby="range-error" class="w-full min-w-0 border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+                aria-describedby="range-error" class="form-control w-100 min-width-zero border border-light-subtle rounded-3 px-2 py-2 fs-6 bg-white">
             </div>
-            <div class="min-w-0">
-              <label for="report-end" class="block text-sm font-medium text-gray-700 mb-1">End date</label>
+            <div class="min-width-zero">
+              <label for="report-end" class="d-block small fw-medium text-body-secondary mb-1">End date</label>
               <input id="report-end" type="date" x-model="rangeEnd" @change="loadRange()" :min="rangeStart" max="9999-12-31" required
-                aria-describedby="range-error" class="w-full min-w-0 border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+                aria-describedby="range-error" class="form-control w-100 min-width-zero border border-light-subtle rounded-3 px-2 py-2 fs-6 bg-white">
             </div>
           </div>
-          <p class="text-xs text-gray-500 mt-1">Includes both dates.</p>
-          <p id="range-error" role="alert" x-show="rangeError" x-text="rangeError" class="text-sm text-red-600 mt-1"></p>
-          <button type="button" x-show="rangeLoadFailed" @click="loadRange()" class="secondary-button mt-2">Try again</button>
-          <p role="status" x-show="rangeLoading" class="text-sm text-gray-500 mt-1">Loading report…</p>
+          <p class="caption text-secondary mt-1">Includes both dates.</p>
+          <p id="range-error" role="alert" x-show="rangeError" x-text="rangeError" class="small text-danger mt-1"></p>
+          <button type="button" x-show="rangeLoadFailed" @click="loadRange()" class="btn btn-outline-secondary mt-2">Try again</button>
+          <p role="status" x-show="rangeLoading" class="small text-secondary mt-1">Loading report…</p>
         </div>
 
-        <div x-show="reportLoading" role="status" class="notice">Loading report…</div>
-        <div x-show="reportError" role="alert" class="notice notice-error"><p x-text="reportError"></p><button class="secondary-button mt-2" @click="loadReport()">Try again</button></div>
+        <div x-show="reportLoading" role="status" class="alert alert-primary">Loading report…</div>
+        <div x-show="reportError" role="alert" class="alert alert-primary alert-danger"><p x-text="reportError"></p><button class="btn btn-outline-secondary mt-2" @click="loadReport()">Try again</button></div>
         <div class="invoice-action">
-          <button @click="openInvoice()" :disabled="!canInvoice" class="primary-button w-full">View invoice</button>
-          <p class="text-sm text-gray-500 mt-2" x-text="invoiceHint"></p>
+          <button @click="openInvoice()" :disabled="!canInvoice" class="btn btn-primary w-100">View invoice</button>
+          <p class="small text-secondary mt-2" x-text="invoiceHint"></p>
         </div>
         <div x-show="!reportLoading && !reportError && (reportMode === 'monthly' || rangeReady)">
-          <p x-show="reportMode === 'range'" class="text-sm text-gray-500 mb-3" x-text="fullDate(rangeStart) + ' – ' + fullDate(rangeEnd)"></p>
-          <div class="report-summary mb-4">
+          <p x-show="reportMode === 'range'" class="small text-secondary mb-2" x-text="fullDate(rangeStart) + ' – ' + fullDate(rangeEnd)"></p>
+          <div class="report-summary mb-3">
             <div class="summary-total"><span>Total earned</span><strong x-text="periodData.currency + periodData.total_amount.toFixed(2)"></strong><small>Labour + expenses</small></div>
             <dl class="summary-grid">
               <div><dt>Hours</dt><dd x-text="periodData.total_hours_fmt"></dd></div>
@@ -238,21 +220,21 @@
           </div>
 
           <!-- Expenses list -->
-          <div x-show="periodData.expenses.length" class="bg-white rounded-lg shadow-sm mb-4 overflow-hidden">
-            <div class="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">Expenses</div>
+          <div x-show="periodData.expenses.length" class="bg-white rounded-3 shadow-sm mb-3 overflow-hidden">
+            <div class="px-3 py-2 bg-light border-bottom border-light-subtle caption fw-semibold text-secondary text-uppercase">Expenses</div>
             <template x-for="e in periodData.expenses" :key="e.id">
               <div class="report-row">
                 <div>
-                  <span class="text-sm font-medium text-gray-800" x-text="fullDate(e.date)"></span>
-                  <span x-show="!reportClientId" class="block text-sm text-gray-500" x-text="clientName(e.client_id)"></span>
-                  <span class="block text-sm text-gray-500" x-text="e.description"></span>
+                  <span class="small fw-medium text-dark" x-text="fullDate(e.date)"></span>
+                  <span x-show="!reportClientId" class="d-block small text-secondary" x-text="clientName(e.client_id)"></span>
+                  <span class="d-block small text-secondary" x-text="e.description"></span>
                 </div>
-                <span class="text-sm font-semibold text-gray-700 shrink-0" x-text="periodData.currency + e.amount.toFixed(2)"></span>
+                <span class="small fw-semibold text-body-secondary flex-shrink-0" x-text="periodData.currency + e.amount.toFixed(2)"></span>
               </div>
             </template>
           </div>
 
-          <p x-show="!periodData.sessions && !periodData.expenses.length" class="text-sm text-gray-500 text-center py-2">No work or expenses for this period.</p>
+          <p x-show="!periodData.sessions && !periodData.expenses.length" class="small text-secondary text-center py-2">No work or expenses for this period.</p>
         </div>
       </div>
 
@@ -260,53 +242,53 @@
       <div x-show="reportMode === 'taxyear'">
         <label for="report-taxyear" class="field-label">Tax year</label>
         <select id="report-taxyear" x-model="selectedTaxYear" @change="loadTaxYear()"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white mb-4 focus:ring-2 focus:ring-blue-500">
+          class="form-select w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6 bg-white mb-3">
           <template x-for="ty in taxYearData.available_tax_years" :key="ty.year">
             <option :value="ty.year" x-text="ty.label"></option>
           </template>
         </select>
 
-        <p x-show="reportLoading" role="status" class="notice">Loading report…</p>
-        <div x-show="reportError" role="alert" class="notice notice-error"><p x-text="reportError"></p><button class="secondary-button mt-2" @click="loadReport()">Try again</button></div>
+        <p x-show="reportLoading" role="status" class="alert alert-primary">Loading report…</p>
+        <div x-show="reportError" role="alert" class="alert alert-primary alert-danger"><p x-text="reportError"></p><button class="btn btn-outline-secondary mt-2" @click="loadReport()">Try again</button></div>
         <div x-show="!reportLoading && !reportError">
         <!-- Metrics -->
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
-            <div class="text-2xl font-bold text-gray-800" x-text="taxYearData.sessions"></div>
-            <div class="text-xs text-gray-500">Sessions</div>
+        <div class="d-grid columns-two gap-3 mb-3">
+          <div class="bg-white rounded-3 shadow-sm p-2 text-center">
+            <div class="fs-4 fw-bold text-dark" x-text="taxYearData.sessions"></div>
+            <div class="caption text-secondary">Sessions</div>
           </div>
-          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
-            <div class="text-2xl font-bold text-gray-800" x-text="taxYearData.total_hours_fmt"></div>
-            <div class="text-xs text-gray-500">Hours</div>
+          <div class="bg-white rounded-3 shadow-sm p-2 text-center">
+            <div class="fs-4 fw-bold text-dark" x-text="taxYearData.total_hours_fmt"></div>
+            <div class="caption text-secondary">Hours</div>
           </div>
-          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
-            <div class="text-2xl font-bold text-gray-800" x-text="taxYearData.currency + taxYearData.total_expenses.toFixed(2)"></div>
-            <div class="text-xs text-gray-500">Expenses</div>
+          <div class="bg-white rounded-3 shadow-sm p-2 text-center">
+            <div class="fs-4 fw-bold text-dark" x-text="taxYearData.currency + taxYearData.total_expenses.toFixed(2)"></div>
+            <div class="caption text-secondary">Expenses</div>
           </div>
-          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
-            <div class="text-2xl font-bold text-emerald-600" x-text="taxYearData.currency + taxYearData.total_amount.toFixed(2)"></div>
-            <div class="text-xs text-gray-500">Total</div>
+          <div class="bg-white rounded-3 shadow-sm p-2 text-center">
+            <div class="fs-4 fw-bold text-success" x-text="taxYearData.currency + taxYearData.total_amount.toFixed(2)"></div>
+            <div class="caption text-secondary">Total</div>
           </div>
-          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
-            <div class="text-2xl font-bold text-gray-800" x-text="taxYearData.total_miles + ' mi'"></div>
-            <div class="text-xs text-gray-500">Total Miles</div>
+          <div class="bg-white rounded-3 shadow-sm p-2 text-center">
+            <div class="fs-4 fw-bold text-dark" x-text="taxYearData.total_miles + ' mi'"></div>
+            <div class="caption text-secondary">Total Miles</div>
           </div>
-          <div class="bg-white rounded-lg shadow-sm p-3 text-center">
-            <div class="text-2xl font-bold text-emerald-600" x-text="taxYearData.currency + taxYearData.mileage_allowance.toFixed(2)"></div>
-            <div class="text-xs text-gray-500">Mileage Allowance</div>
+          <div class="bg-white rounded-3 shadow-sm p-2 text-center">
+            <div class="fs-4 fw-bold text-success" x-text="taxYearData.currency + taxYearData.mileage_allowance.toFixed(2)"></div>
+            <div class="caption text-secondary">Mileage Allowance</div>
           </div>
         </div>
 
         <!-- Monthly breakdown -->
-        <div x-show="taxYearData.breakdown.length" class="bg-white rounded-lg shadow-sm overflow-hidden mb-4">
-          <div class="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">Monthly Breakdown</div>
+        <div x-show="taxYearData.breakdown.length" class="bg-white rounded-3 shadow-sm overflow-hidden mb-3">
+          <div class="px-3 py-2 bg-light border-bottom border-light-subtle caption fw-semibold text-secondary text-uppercase">Monthly Breakdown</div>
           <template x-for="m in taxYearData.breakdown" :key="m.label">
-            <div class="px-4 py-2.5 border-b border-gray-50 flex justify-between items-center">
+            <div class="px-3 py-2 border-bottom border-light-subtle d-flex justify-content-between align-items-center">
               <div>
-                <span class="text-sm font-medium text-gray-800" x-text="m.label"></span>
-                <span class="text-xs text-gray-400 ml-2" x-text="m.sessions + ' sessions, ' + m.hours_fmt + ', ' + m.miles + ' mi'"></span>
+                <span class="small fw-medium text-dark" x-text="m.label"></span>
+                <span class="caption text-secondary ms-2" x-text="m.sessions + ' sessions, ' + m.hours_fmt + ', ' + m.miles + ' mi'"></span>
               </div>
-              <span class="text-sm font-semibold text-gray-700" x-text="taxYearData.currency + m.total.toFixed(2)"></span>
+              <span class="small fw-semibold text-body-secondary" x-text="taxYearData.currency + m.total.toFixed(2)"></span>
             </div>
           </template>
         </div>
@@ -317,199 +299,203 @@
     <!-- =========== HISTORY TAB =========== -->
     <section x-show="tab === 'history'">
       <!-- Work / Expenses toggle -->
-      <div class="segmented mb-4">
-        <button @click="historyMode = 'work'; historyPage = 1" :aria-pressed="historyMode === 'work'" :class="historyMode === 'work' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
-          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Work</button>
-        <button @click="historyMode = 'expenses'; historyPage = 1" :aria-pressed="historyMode === 'expenses'" :class="historyMode === 'expenses' ? 'bg-white shadow text-blue-600' : 'text-gray-500'"
-          class="flex-1 text-center py-2 rounded-md text-sm font-medium transition-all">Expenses</button>
+      <div class="segmented mb-3">
+        <button @click="historyMode = 'work'; historyPage = 1" :aria-pressed="historyMode === 'work'" :class="historyMode === 'work' ? 'is-active' : ''"
+          class="btn segment-button">Work</button>
+        <button @click="historyMode = 'expenses'; historyPage = 1" :aria-pressed="historyMode === 'expenses'" :class="historyMode === 'expenses' ? 'is-active' : ''"
+          class="btn segment-button">Expenses</button>
       </div>
 
       <div class="history-filters">
-        <div x-show="!historySearching" class="mb-4">
-          <div class="flex justify-between items-center gap-2 mb-1">
+        <div x-show="!historySearching" class="history-month-field">
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
             <label for="history-month" class="field-label">Month</label>
-            <button class="text-sm font-semibold text-blue-700 px-2" @click="currentHistoryMonth()">This month</button>
+            <button class="btn small fw-semibold text-primary-emphasis px-2" @click="currentHistoryMonth()">This month</button>
           </div>
           <div class="history-month-controls">
-            <button @click="shiftHistoryMonth(-1)" :disabled="historyMonth === '0001-01'" class="secondary-button" aria-label="Previous month" title="Previous month"><span aria-hidden="true">&#8592;</span></button>
-            <input id="history-month" type="month" :value="historyMonth" @change="setHistoryMonth($event.target.value); $event.target.value = historyMonth" min="0001-01" max="9999-12" required>
-            <button @click="shiftHistoryMonth(1)" :disabled="historyMonth === '9999-12'" class="secondary-button" aria-label="Next month" title="Next month"><span aria-hidden="true">&#8594;</span></button>
+            <button @click="shiftHistoryMonth(-1)" :disabled="historyMonth === '0001-01'" class="btn btn-outline-secondary" aria-label="Previous month" title="Previous month"><span class="icon" aria-hidden="true" x-html="icons.chevron_left"></span></button>
+            <input id="history-month" type="month" :value="historyMonth" @change="setHistoryMonth($event.target.value); $event.target.value = historyMonth" min="0001-01" max="9999-12" required class="form-control">
+            <button @click="shiftHistoryMonth(1)" :disabled="historyMonth === '9999-12'" class="btn btn-outline-secondary" aria-label="Next month" title="Next month"><span class="icon" aria-hidden="true" x-html="icons.chevron_right"></span></button>
           </div>
         </div>
-        <label for="history-search" class="field-label">Search all history</label>
-        <input id="history-search" type="search" x-model="historySearch" @input="historyPage = 1" placeholder="Client, date, amount or description" aria-describedby="history-search-scope">
-        <p id="history-search-scope" class="text-sm text-gray-500 mt-1">Search covers every month and year for the selected client and entry type.</p>
-        <button x-show="historySearching" @click="historySearch = ''; historyPage = 1" class="secondary-button mt-2" x-text="'Back to ' + historyMonthLabel"></button>
-        <div x-show="clients.length > 1" class="mt-3">
+        <div x-show="clients.length > 1" class="history-client-field">
           <label for="history-client" class="field-label">Client</label>
-          <select id="history-client" x-model="historyClientId" @change="historyPage = 1"><option value="">All clients</option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+          <select id="history-client" x-model="historyClientId" @change="historyPage = 1" class="form-select"><option value="">All clients</option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
         </div>
+        <div class="history-search-field">
+        <label for="history-search" class="field-label">Search all history</label>
+        <input id="history-search" type="search" x-model="historySearch" @input="historyPage = 1" placeholder="Client, date, amount or description" aria-describedby="history-search-scope" class="form-control">
+        <p id="history-search-scope" class="small text-secondary mt-1">All dates, for the selected client and entry type.</p>
+        <button x-show="historySearching" @click="historySearch = ''; historyPage = 1" class="btn btn-outline-secondary mt-2" x-text="'Back to ' + historyMonthLabel"></button>
+        </div>
+
       </div>
-      <p x-show="historyLoading" role="status" class="notice">Refreshing history…</p>
-      <div x-show="historyError" role="alert" class="notice notice-error"><p x-text="historyError"></p><button class="secondary-button mt-2" @click="loadHistory()">Try again</button></div>
-      <div x-ref="historyResults" tabindex="-1" class="history-results mb-3">
-        <h2 class="font-semibold text-gray-800" x-text="historySearching ? 'Search results · all dates' : historyMonthLabel"></h2>
-        <div class="flex justify-between items-center gap-3 mt-1 text-sm text-gray-600" role="status" aria-live="polite">
+      <p x-show="historyLoading" role="status" class="alert alert-primary">Refreshing history…</p>
+      <div x-show="historyError" role="alert" class="alert alert-primary alert-danger"><p x-text="historyError"></p><button class="btn btn-outline-secondary mt-2" @click="loadHistory()">Try again</button></div>
+      <div x-ref="historyResults" tabindex="-1" class="history-results mb-2">
+        <h2 class="fw-semibold text-dark" x-text="historySearching ? 'Search results · all dates' : historyMonthLabel"></h2>
+        <div class="d-flex justify-content-between align-items-center gap-3 mt-1 small text-secondary" role="status" aria-live="polite">
           <span x-text="historyResultLabel"></span>
           <span x-text="'Total: ' + config.currency_symbol + historyTotal.toFixed(2)"></span>
         </div>
       </div>
-      <nav x-show="historyPageCount > 1" aria-label="History pages" class="history-pagination mb-3">
-        <button @click="changeHistoryPage(-1)" :disabled="currentHistoryPage === 1" class="secondary-button">Previous</button>
-        <span class="text-sm text-gray-600" x-text="currentHistoryPage + ' / ' + historyPageCount"></span>
-        <button @click="changeHistoryPage(1)" :disabled="currentHistoryPage === historyPageCount" class="secondary-button">Next</button>
+      <nav x-show="historyPageCount > 1" aria-label="History pages" class="history-pagination mb-2">
+        <button @click="changeHistoryPage(-1)" :disabled="currentHistoryPage === 1" class="btn btn-outline-secondary">Previous</button>
+        <span class="small text-secondary" x-text="currentHistoryPage + ' / ' + historyPageCount"></span>
+        <button @click="changeHistoryPage(1)" :disabled="currentHistoryPage === historyPageCount" class="btn btn-outline-secondary">Next</button>
       </nav>
       <div x-show="!filteredHistory.length && !historyLoading && !historyError" class="empty-state">
         <h2 x-text="historySearching ? 'No matching records' : 'No records this month'"></h2>
         <p x-text="historySearching ? 'Try another search or choose a different client.' : 'Choose another month or add an entry.'"></p>
-        <button x-show="!historySearching && latestHistoryMonth && latestHistoryMonth !== historyMonth" @click="setHistoryMonth(latestHistoryMonth)" class="secondary-button mt-3">Go to latest records</button>
-        <button x-show="historySearching || historyClientId" @click="historySearch = ''; historyClientId = ''; historyPage = 1" class="secondary-button mt-3">Clear filters</button>
-        <button x-show="!historySearching" @click="logMode = historyMode === 'work' ? 'work' : 'expense'; tab = 'log'; onTabSwitch('log')" class="primary-button mt-3">Add an entry</button>
+        <button x-show="!historySearching && latestHistoryMonth && latestHistoryMonth !== historyMonth" @click="setHistoryMonth(latestHistoryMonth)" class="btn btn-outline-secondary mt-2">Go to latest records</button>
+        <button x-show="historySearching || historyClientId" @click="historySearch = ''; historyClientId = ''; historyPage = 1" class="btn btn-outline-secondary mt-2">Clear filters</button>
+        <button x-show="!historySearching" @click="logMode = historyMode === 'work' ? 'work' : 'expense'; tab = 'log'; onTabSwitch('log')" class="btn btn-primary mt-2">Add an entry</button>
       </div>
-      <div class="space-y-3">
+      <div class="history-list">
         <template x-for="e in visibleHistory" :key="historyMode + e.id">
           <article class="history-card">
             <div class="history-card-heading">
-              <div class="min-w-0"><h2 x-text="fullDate(e.date)"></h2><p x-text="clientName(e.client_id)"></p></div>
+              <div class="min-width-zero"><h2 x-text="fullDate(e.date)"></h2><p x-text="clientName(e.client_id)"></p></div>
               <strong class="history-amount" x-text="config.currency_symbol + e.amount.toFixed(2)"></strong>
             </div>
             <div class="history-card-footer">
-              <p class="min-w-0" x-text="historyMode === 'work' ? e.start_time + '–' + e.end_time + ' · ' + fmtHours(e.hours) + ((e.miles || 0) > 0 ? ' · ' + e.miles + ' mi' : '') : (e.description || 'Expense')"></p>
-              <div class="flex gap-2 shrink-0">
-                <button @click="openEditor(historyMode === 'work' ? 'work' : 'expense', e, $event.currentTarget)" :aria-label="'Edit ' + (historyMode === 'work' ? 'work entry' : 'expense') + ' for ' + clientName(e.client_id) + ' on ' + fullDate(e.date)" title="Edit entry" class="icon-button edit-button"><span class="icon text-xl" x-html="icons.edit"></span></button>
-                <button @click="historyMode === 'work' ? deleteEntry(e.id) : deleteExpense(e.id)" :aria-label="'Delete ' + (historyMode === 'work' ? 'work entry' : 'expense') + ' for ' + clientName(e.client_id) + ' on ' + fullDate(e.date)" title="Delete entry" class="icon-button delete-button"><span class="icon text-xl" x-html="icons.delete"></span></button>
+              <p class="min-width-zero" x-text="historyMode === 'work' ? e.start_time + '–' + e.end_time + ' · ' + fmtHours(e.hours) + ((e.miles || 0) > 0 ? ' · ' + e.miles + ' mi' : '') : (e.description || 'Expense')"></p>
+              <div class="d-flex gap-2 flex-shrink-0">
+                <button @click="openEditor(historyMode === 'work' ? 'work' : 'expense', e, $event.currentTarget)" :aria-label="'Edit ' + (historyMode === 'work' ? 'work entry' : 'expense') + ' for ' + clientName(e.client_id) + ' on ' + fullDate(e.date)" title="Edit entry" class="btn icon-button edit-button"><span class="icon fs-5" x-html="icons.edit"></span></button>
+                <button @click="historyMode === 'work' ? deleteEntry(e.id) : deleteExpense(e.id)" :aria-label="'Delete ' + (historyMode === 'work' ? 'work entry' : 'expense') + ' for ' + clientName(e.client_id) + ' on ' + fullDate(e.date)" title="Delete entry" class="btn icon-button delete-button"><span class="icon fs-5" x-html="icons.delete"></span></button>
               </div>
             </div>
           </article>
         </template>
       </div>
-      <nav x-show="historyPageCount > 1" aria-label="History pages at end of results" class="history-pagination mt-4">
-        <button @click="changeHistoryPage(-1)" :disabled="currentHistoryPage === 1" class="secondary-button">Previous</button>
-        <span class="text-sm text-gray-600" x-text="currentHistoryPage + ' / ' + historyPageCount"></span>
-        <button @click="changeHistoryPage(1)" :disabled="currentHistoryPage === historyPageCount" class="secondary-button">Next</button>
+      <nav x-show="historyPageCount > 1" aria-label="History pages at end of results" class="history-pagination mt-3">
+        <button @click="changeHistoryPage(-1)" :disabled="currentHistoryPage === 1" class="btn btn-outline-secondary">Previous</button>
+        <span class="small text-secondary" x-text="currentHistoryPage + ' / ' + historyPageCount"></span>
+        <button @click="changeHistoryPage(1)" :disabled="currentHistoryPage === historyPageCount" class="btn btn-outline-secondary">Next</button>
       </nav>
     </section>
 
     <!-- =========== SETTINGS TAB =========== -->
-    <section x-show="tab === 'settings'">
+    <section x-show="tab === 'settings'" class="settings-view">
+      <div class="settings-grid">
 
       <!-- Rates -->
-      <details class="bg-white rounded-lg shadow-sm mb-3" open>
-        <summary class="px-4 py-3 font-medium text-gray-800 cursor-pointer select-none flex items-center justify-between">
+      <details class="settings-panel" open>
+        <summary class="px-3 py-2 fw-medium text-dark user-select-none d-flex align-items-center justify-content-between">
           Rates
-          <span class="icon text-gray-400 text-lg" x-html="icons.expand_more"></span>
+          <span class="icon text-secondary lead-size" x-html="icons.expand_more"></span>
         </summary>
-        <div class="px-4 pb-4 space-y-3">
-          <div class="grid grid-cols-2 gap-3">
+        <div class="px-3 pb-3 stack-medium">
+          <div class="d-grid columns-two gap-3">
             <div>
-              <label for="field-config-hourly_rate" class="block text-xs font-medium text-gray-500 mb-1">Hourly Rate</label>
+              <label for="field-config-hourly_rate" class="d-block caption fw-medium text-secondary mb-1">Hourly Rate</label>
               <input id="field-config-hourly_rate" type="number" step="0.50" min="0" x-model.number="config.hourly_rate"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
             </div>
             <div>
-              <label for="field-config-currency_symbol" class="block text-xs font-medium text-gray-500 mb-1">Currency</label>
+              <label for="field-config-currency_symbol" class="d-block caption fw-medium text-secondary mb-1">Currency</label>
               <select id="field-config-currency_symbol" x-model="config.currency_symbol"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+                class="form-select w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6 bg-white">
                 <option value="£">£</option>
                 <option value="$">$</option>
                 <option value="€">€</option>
               </select>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="d-grid columns-two gap-3">
             <div>
-              <label for="field-config-tax_year_start_month" class="block text-xs font-medium text-gray-500 mb-1">Tax Year Starts</label>
+              <label for="field-config-tax_year_start_month" class="d-block caption fw-medium text-secondary mb-1">Tax Year Starts</label>
               <select id="field-config-tax_year_start_month" x-model.number="config.tax_year_start_month"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base bg-white focus:ring-2 focus:ring-blue-500">
+                class="form-select w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6 bg-white">
                 <template x-for="(name, i) in monthNames" :key="i">
                   <option :value="i + 1" x-text="name"></option>
                 </template>
               </select>
             </div>
             <div>
-              <label for="field-config-invoice_prefix" class="block text-xs font-medium text-gray-500 mb-1">Invoice Prefix</label>
+              <label for="field-config-invoice_prefix" class="d-block caption fw-medium text-secondary mb-1">Invoice Prefix</label>
               <input id="field-config-invoice_prefix" type="text" x-model="config.invoice_prefix"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
             </div>
           </div>
         </div>
       </details>
 
       <!-- Business Info -->
-      <details class="bg-white rounded-lg shadow-sm mb-3">
-        <summary class="px-4 py-3 font-medium text-gray-800 cursor-pointer select-none flex items-center justify-between">
+      <details class="settings-panel">
+        <summary class="px-3 py-2 fw-medium text-dark user-select-none d-flex align-items-center justify-content-between">
           Business Info
-          <span class="icon text-gray-400 text-lg" x-html="icons.expand_more"></span>
+          <span class="icon text-secondary lead-size" x-html="icons.expand_more"></span>
         </summary>
-        <div class="px-4 pb-4 space-y-3">
+        <div class="px-3 pb-3 stack-medium">
           <div>
-            <label for="field-config-business_name" class="block text-xs font-medium text-gray-500 mb-1">Your Name</label>
+            <label for="field-config-business_name" class="d-block caption fw-medium text-secondary mb-1">Your Name</label>
             <input id="field-config-business_name" type="text" x-model="config.business_name"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
           </div>
           <div>
-            <label for="field-config-business_address" class="block text-xs font-medium text-gray-500 mb-1">Address</label>
+            <label for="field-config-business_address" class="d-block caption fw-medium text-secondary mb-1">Address</label>
             <textarea id="field-config-business_address" x-model="config.business_address" rows="2"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+              class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6"></textarea>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="d-grid columns-two gap-3">
             <div>
-              <label for="field-config-business_email" class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+              <label for="field-config-business_email" class="d-block caption fw-medium text-secondary mb-1">Email</label>
               <input id="field-config-business_email" type="email" x-model="config.business_email"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
             </div>
             <div>
-              <label for="field-config-business_phone" class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+              <label for="field-config-business_phone" class="d-block caption fw-medium text-secondary mb-1">Phone</label>
               <input id="field-config-business_phone" type="tel" x-model="config.business_phone"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
             </div>
           </div>
         </div>
       </details>
 
       <!-- Clients -->
-      <details class="bg-white rounded-lg shadow-sm mb-3">
-        <summary class="px-4 py-3 font-medium text-gray-800 cursor-pointer select-none flex items-center justify-between">
+      <details class="settings-panel">
+        <summary class="px-3 py-2 fw-medium text-dark user-select-none d-flex align-items-center justify-content-between">
           Clients
-          <span class="icon text-gray-400 text-lg" x-html="icons.expand_more"></span>
+          <span class="icon text-secondary lead-size" x-html="icons.expand_more"></span>
         </summary>
-        <div class="px-4 pb-4">
+        <div class="px-3 pb-3">
           <!-- Existing clients -->
-          <div class="space-y-2 mb-4">
+          <div class="stack-small mb-3">
             <template x-for="c in clients" :key="c.id">
-              <div class="flex items-center justify-between py-2 border-b border-gray-100">
-                <div class="flex-1 min-w-0">
-                  <div class="text-sm font-medium text-gray-800" x-text="c.name"></div>
-                  <div class="text-xs text-gray-400" x-text="(c.address || '').replace(/\n/g, ', ')"></div>
+              <div class="d-flex align-items-center justify-content-between py-2 border-bottom border-light-subtle">
+                <div class="flex-fill min-width-zero">
+                  <div class="small fw-medium text-dark" x-text="c.name"></div>
+                  <div class="caption text-secondary" x-text="(c.address || '').replace(/\n/g, ', ')"></div>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                  <div class="text-right">
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                  <div class="text-end">
                     <input type="number" step="0.1" min="0" :aria-label="'Default miles for ' + c.name" :value="c.default_miles || 0"
                       @change="updateClientMiles(c.id, $event.target.value)"
-                      class="w-16 text-right text-sm border border-gray-200 rounded px-1 py-1 focus:ring-1 focus:ring-blue-500">
-                    <div class="text-[10px] text-gray-400">miles</div>
+                      class="form-control mileage-width text-end small border border-light-subtle rounded px-1 py-1">
+                    <div class="caption text-secondary">miles</div>
                   </div>
-                  <button x-show="clients.length > 1" @click="deleteClient(c.id)" :aria-label="'Delete client ' + c.name" class="text-red-400 hover:text-red-600 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
-                    <span class="icon text-xl" x-html="icons.delete"></span>
+                  <button x-show="clients.length > 1" @click="deleteClient(c.id)" :aria-label="'Delete client ' + c.name" class="btn text-danger p-2 touch-target d-flex align-items-center justify-content-center">
+                    <span class="icon fs-5" x-html="icons.delete"></span>
                   </button>
                 </div>
               </div>
             </template>
           </div>
           <!-- Add new -->
-          <div class="border-t border-gray-200 pt-3 space-y-3">
-            <div class="text-xs font-semibold text-gray-500 uppercase">Add Client</div>
+          <div class="border-top border-light-subtle pt-2 stack-medium">
+            <div class="caption fw-semibold text-secondary text-uppercase">Add Client</div>
             <input type="text" aria-label="Client name" x-model="newClientName" placeholder="Client name"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
             <textarea aria-label="Client address" x-model="newClientAddress" placeholder="Address" rows="2"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+              class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6"></textarea>
             <div>
               <input type="number" step="0.1" min="0" aria-label="Default round-trip miles" x-model.number="newClientMiles" placeholder="Default round-trip miles"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-              <div class="text-xs text-gray-400 mt-1">Default round-trip mileage (home to client and back)</div>
+                class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
+              <div class="caption text-secondary mt-1">Default round-trip mileage (home to client and back)</div>
             </div>
             <button @click="addClient()" :disabled="!newClientName.trim()"
-              class="w-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 font-medium py-2.5 rounded-lg text-sm transition-colors">
+              class="btn w-100 bg-body-secondary text-body-secondary fw-medium py-2 rounded-3 small">
               Add Client
             </button>
           </div>
@@ -517,62 +503,63 @@
       </details>
 
       <!-- Payment Details -->
-      <details class="bg-white rounded-lg shadow-sm mb-3">
-        <summary class="px-4 py-3 font-medium text-gray-800 cursor-pointer select-none flex items-center justify-between">
+      <details class="settings-panel">
+        <summary class="px-3 py-2 fw-medium text-dark user-select-none d-flex align-items-center justify-content-between">
           Payment Details
-          <span class="icon text-gray-400 text-lg" x-html="icons.expand_more"></span>
+          <span class="icon text-secondary lead-size" x-html="icons.expand_more"></span>
         </summary>
-        <div class="px-4 pb-4 space-y-3">
-          <div class="grid grid-cols-2 gap-3">
+        <div class="px-3 pb-3 stack-medium">
+          <div class="d-grid columns-two gap-3">
             <div>
-              <label for="field-config-bank_name" class="block text-xs font-medium text-gray-500 mb-1">Bank</label>
+              <label for="field-config-bank_name" class="d-block caption fw-medium text-secondary mb-1">Bank</label>
               <input id="field-config-bank_name" type="text" x-model="config.bank_name"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
             </div>
             <div>
-              <label for="field-config-account_name" class="block text-xs font-medium text-gray-500 mb-1">Account Name</label>
+              <label for="field-config-account_name" class="d-block caption fw-medium text-secondary mb-1">Account Name</label>
               <input id="field-config-account_name" type="text" x-model="config.account_name"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="d-grid columns-two gap-3">
             <div>
-              <label for="field-config-sort_code" class="block text-xs font-medium text-gray-500 mb-1">Sort Code</label>
+              <label for="field-config-sort_code" class="d-block caption fw-medium text-secondary mb-1">Sort Code</label>
               <input id="field-config-sort_code" type="text" x-model="config.sort_code"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
             </div>
             <div>
-              <label for="field-config-account_number" class="block text-xs font-medium text-gray-500 mb-1">Account No</label>
+              <label for="field-config-account_number" class="d-block caption fw-medium text-secondary mb-1">Account No</label>
               <input id="field-config-account_number" type="text" x-model="config.account_number"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
             </div>
           </div>
           <div>
-            <label for="field-config-payment_terms" class="block text-xs font-medium text-gray-500 mb-1">Payment Terms (days)</label>
+            <label for="field-config-payment_terms" class="d-block caption fw-medium text-secondary mb-1">Payment Terms (days)</label>
             <input id="field-config-payment_terms" type="number" min="0" max="90" x-model.number="config.payment_terms"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
           </div>
         </div>
       </details>
 
+      </div>
       <!-- Save button -->
       <div class="settings-save">
       <button @click="saveConfig()" :disabled="saving"
-        class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg text-base transition-all mb-4">
+        class="btn w-100 btn-primary text-white fw-semibold py-2 rounded-3 fs-6 mb-3">
         <span x-text="saving ? 'Saving…' : 'Save settings'"></span>
       </button>
 
       </div>
       <!-- Download a copy of saved data to this device. -->
-      <section class="bg-white rounded-lg shadow-sm p-4 mb-3" aria-labelledby="backup-title">
-        <h2 id="backup-title" class="font-semibold text-gray-800 mb-2">Back up your data</h2>
-        <p class="text-sm text-gray-600 mb-3">Save a copy of all work entries, expenses, clients and settings to your phone.</p>
-        <button @click="downloadBackup()" :disabled="backupBusy || saving" :aria-busy="backupBusy" class="primary-button w-full" x-text="backupBusy ? 'Preparing backup…' : 'Download backup'"></button>
-        <p class="text-sm text-gray-500 mt-3">Your phone will download a ZIP file. Keep it in Files or Downloads, or move it to your preferred backup folder.</p>
-        <p class="text-sm text-gray-500 mt-2">Includes saved settings only. Save any settings changes first. The backup contains client and payment details, so keep it somewhere private.</p>
-        <p class="text-sm text-gray-500 mt-2">To restore a backup, contact the person who manages this app.</p>
-        <p x-show="backupStatus" x-text="backupStatus" role="status" class="notice notice-success mt-3"></p>
-        <p x-show="backupError" x-text="backupError" role="alert" class="notice notice-error mt-3"></p>
+      <section class="backup-panel" aria-labelledby="backup-title">
+        <h2 id="backup-title" class="fw-semibold text-dark mb-2">Back up your data</h2>
+        <p class="small text-secondary mb-2">Save a copy of all work entries, expenses, clients and settings to this device.</p>
+        <button @click="downloadBackup()" :disabled="backupBusy || saving" :aria-busy="backupBusy" class="btn btn-outline-primary w-100" x-text="backupBusy ? 'Preparing backup…' : 'Download backup'"></button>
+        <p class="small text-secondary mt-2">Your browser will download a ZIP file. Keep it in Files or Downloads, or move it to your preferred backup folder.</p>
+        <p class="small text-secondary mt-2">Includes saved settings only. Save any settings changes first. The backup contains client and payment details, so keep it somewhere private.</p>
+        <p class="small text-secondary mt-2">To restore a backup, contact the person who manages this app.</p>
+        <p x-show="backupStatus" x-text="backupStatus" role="status" class="alert alert-primary alert-success mt-2"></p>
+        <p x-show="backupError" x-text="backupError" role="alert" class="alert alert-primary alert-danger mt-2"></p>
       </section>
     </section>
     </div>
@@ -580,55 +567,55 @@
 
 
   <!-- Edit a separate draft; keep History mounted to preserve its position. -->
-  <div x-show="editor.open" class="editor-overlay fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 sm:p-4" @click.self="closeEditor()" @keydown="editorKeydown($event)">
-    <section x-ref="editDialog" role="dialog" aria-modal="true" aria-labelledby="edit-title" class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
-      <h2 id="edit-title" class="text-lg font-bold text-gray-800 mb-4" x-text="editor.kind === 'work' ? 'Edit work entry' : 'Edit expense'"></h2>
+  <div x-show="editor.open" class="editor-overlay position-fixed overlay-inset dialog-layer dialog-backdrop d-flex align-items-center justify-content-center" @click.self="closeEditor()" @keydown="editorKeydown($event)">
+    <section x-ref="editDialog" role="dialog" aria-modal="true" aria-labelledby="edit-title" class="editor-sheet">
+      <h2 id="edit-title" class="lead-size fw-bold text-dark mb-3" x-text="editor.kind === 'work' ? 'Edit work entry' : 'Edit expense'"></h2>
       <form @submit.prevent="saveEdit()" novalidate>
-        <p role="alert" x-show="editor.error" x-text="editor.error" class="text-sm text-red-600 mb-3"></p>
-        <fieldset :disabled="editor.saving" class="space-y-3">
+        <p role="alert" x-show="editor.error" x-text="editor.error" class="small text-danger mb-2"></p>
+        <fieldset :disabled="editor.saving" class="stack-medium">
           <div>
-            <label for="edit-client_id" class="block text-sm font-medium text-gray-700 mb-1">Client</label>
-            <select x-ref="editClient" id="edit-client_id" x-model="editor.draft.client_id" :aria-invalid="!!editor.errors.client_id" aria-describedby="edit-client_id-error" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500"><option value="">Select a client</option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
-            <p id="edit-client_id-error" class="text-sm text-red-600 mt-1" x-show="editor.errors.client_id" x-text="editor.errors.client_id"></p>
+            <label for="edit-client_id" class="d-block small fw-medium text-body-secondary mb-1">Client</label>
+            <select x-ref="editClient" id="edit-client_id" x-model="editor.draft.client_id" :aria-invalid="!!editor.errors.client_id" aria-describedby="edit-client_id-error" class="form-select w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6"><option value="">Select a client</option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+            <p id="edit-client_id-error" class="small text-danger mt-1" x-show="editor.errors.client_id" x-text="editor.errors.client_id"></p>
           </div>
           <div>
-            <label for="edit-date" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <input type="date" id="edit-date" x-model="editor.draft.date" :aria-invalid="!!editor.errors.date" aria-describedby="edit-date-error" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500">
-            <p id="edit-date-error" class="text-sm text-red-600 mt-1" x-show="editor.errors.date" x-text="editor.errors.date"></p>
+            <label for="edit-date" class="d-block small fw-medium text-body-secondary mb-1">Date</label>
+            <input type="date" id="edit-date" x-model="editor.draft.date" :aria-invalid="!!editor.errors.date" aria-describedby="edit-date-error" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
+            <p id="edit-date-error" class="small text-danger mt-1" x-show="editor.errors.date" x-text="editor.errors.date"></p>
           </div>
           <div x-show="editor.kind === 'work'">
-            <label for="edit-start_time" class="block text-sm font-medium text-gray-700 mb-1">Start</label>
-            <input type="time" id="edit-start_time" x-model="editor.draft.start_time" :aria-invalid="!!editor.errors.start_time" aria-describedby="edit-start_time-error" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500">
-            <p id="edit-start_time-error" class="text-sm text-red-600 mt-1" x-show="editor.errors.start_time" x-text="editor.errors.start_time"></p>
+            <label for="edit-start_time" class="d-block small fw-medium text-body-secondary mb-1">Start</label>
+            <input type="time" id="edit-start_time" x-model="editor.draft.start_time" :aria-invalid="!!editor.errors.start_time" aria-describedby="edit-start_time-error" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
+            <p id="edit-start_time-error" class="small text-danger mt-1" x-show="editor.errors.start_time" x-text="editor.errors.start_time"></p>
           </div>
           <div x-show="editor.kind === 'work'">
-            <label for="edit-end_time" class="block text-sm font-medium text-gray-700 mb-1">End</label>
-            <input type="time" id="edit-end_time" x-model="editor.draft.end_time" :aria-invalid="!!editor.errors.end_time" aria-describedby="edit-end_time-error" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500">
-            <p id="edit-end_time-error" class="text-sm text-red-600 mt-1" x-show="editor.errors.end_time" x-text="editor.errors.end_time"></p>
+            <label for="edit-end_time" class="d-block small fw-medium text-body-secondary mb-1">End</label>
+            <input type="time" id="edit-end_time" x-model="editor.draft.end_time" :aria-invalid="!!editor.errors.end_time" aria-describedby="edit-end_time-error" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
+            <p id="edit-end_time-error" class="small text-danger mt-1" x-show="editor.errors.end_time" x-text="editor.errors.end_time"></p>
           </div>
           <div x-show="editor.kind === 'work'">
-            <label for="edit-miles" class="block text-sm font-medium text-gray-700 mb-1">Miles (round trip)</label>
-            <input type="number" step="0.1" min="0" id="edit-miles" x-model.number="editor.draft.miles" :aria-invalid="!!editor.errors.miles" aria-describedby="edit-miles-error" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500">
-            <p id="edit-miles-error" class="text-sm text-red-600 mt-1" x-show="editor.errors.miles" x-text="editor.errors.miles"></p>
+            <label for="edit-miles" class="d-block small fw-medium text-body-secondary mb-1">Miles (round trip)</label>
+            <input type="number" step="0.1" min="0" id="edit-miles" x-model.number="editor.draft.miles" :aria-invalid="!!editor.errors.miles" aria-describedby="edit-miles-error" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
+            <p id="edit-miles-error" class="small text-danger mt-1" x-show="editor.errors.miles" x-text="editor.errors.miles"></p>
           </div>
           <div x-show="editor.kind === 'expense'">
-            <label for="edit-amount" class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-            <input type="number" step="0.01" min="0.01" id="edit-amount" x-model.number="editor.draft.amount" :aria-invalid="!!editor.errors.amount" aria-describedby="edit-amount-error" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500">
-            <p id="edit-amount-error" class="text-sm text-red-600 mt-1" x-show="editor.errors.amount" x-text="editor.errors.amount"></p>
+            <label for="edit-amount" class="d-block small fw-medium text-body-secondary mb-1">Amount</label>
+            <input type="number" step="0.01" min="0.01" id="edit-amount" x-model.number="editor.draft.amount" :aria-invalid="!!editor.errors.amount" aria-describedby="edit-amount-error" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
+            <p id="edit-amount-error" class="small text-danger mt-1" x-show="editor.errors.amount" x-text="editor.errors.amount"></p>
           </div>
           <div x-show="editor.kind === 'expense'">
-            <label for="edit-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input type="text" id="edit-description" x-model="editor.draft.description" :aria-invalid="!!editor.errors.description" aria-describedby="edit-description-error" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500">
-            <p id="edit-description-error" class="text-sm text-red-600 mt-1" x-show="editor.errors.description" x-text="editor.errors.description"></p>
+            <label for="edit-description" class="d-block small fw-medium text-body-secondary mb-1">Description</label>
+            <input type="text" id="edit-description" x-model="editor.draft.description" :aria-invalid="!!editor.errors.description" aria-describedby="edit-description-error" class="form-control w-100 border border-light-subtle rounded-3 px-2 py-2 fs-6">
+            <p id="edit-description-error" class="small text-danger mt-1" x-show="editor.errors.description" x-text="editor.errors.description"></p>
           </div>
-          <div x-show="editor.kind === 'work'" class="rounded-lg bg-blue-50 p-3 text-sm" aria-live="polite">
+          <div x-show="editor.kind === 'work'" class="rounded-3 bg-primary-subtle p-2 small" aria-live="polite">
             <p>Original hourly rate: <strong x-text="config.currency_symbol + Number(editor.draft.hourly_rate || 0).toFixed(2)"></strong></p>
             <p x-text="fmtHours(calcHours(editor.draft.start_time, editor.draft.end_time)) + ' = ' + config.currency_symbol + (calcHours(editor.draft.start_time, editor.draft.end_time) * (editor.draft.hourly_rate || 0)).toFixed(2)"></p>
-            <p x-show="editor.draft.end_time && editor.draft.start_time && editor.draft.end_time < editor.draft.start_time" class="mt-1 font-medium">Overnight work: end time is the following day.</p>
+            <p x-show="editor.draft.end_time && editor.draft.start_time && editor.draft.end_time < editor.draft.start_time" class="mt-1 fw-medium">Overnight work: end time is the following day.</p>
           </div>
-          <div class="editor-actions flex gap-3 pt-2">
-            <button type="button" @click="closeEditor()" class="flex-1 border border-gray-300 rounded-lg py-3 text-gray-700">Cancel</button>
-            <button type="submit" class="flex-1 bg-blue-600 text-white rounded-lg py-3 font-semibold disabled:opacity-50" :disabled="editor.saving" x-text="editor.saving ? 'Saving…' : 'Save changes'"></button>
+          <div class="editor-actions">
+            <button type="button" @click="closeEditor()" class="btn flex-fill border border-light-subtle rounded-3 py-2 text-body-secondary">Cancel</button>
+            <button type="submit" class="btn flex-fill btn-primary text-white rounded-3 py-2 fw-semibold" :disabled="editor.saving" x-text="editor.saving ? 'Saving…' : 'Save changes'"></button>
           </div>
         </fieldset>
       </form>
@@ -637,28 +624,28 @@
 
 
   <!-- ===== DELETE CONFIRM DIALOG ===== -->
-  <div x-show="deleteConfirm.show" x-effect="document.body.classList.toggle('dialog-open', deleteConfirm.show || editor.open)" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="if (!deleteBusy) deleteConfirm.show = false" @keydown.escape="if (!deleteBusy) deleteConfirm.show = false">
-    <div role="dialog" aria-modal="true" aria-labelledby="delete-title" class="bg-white rounded-xl shadow-xl mx-4 p-6 max-w-sm w-full">
-      <h3 id="delete-title" class="text-lg font-bold text-gray-800 mb-2">Delete this <span x-text="deleteConfirm.type"></span>?</h3>
-      <p class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
-      <p role="alert" x-show="deleteError" x-text="deleteError" class="text-sm text-red-600 mb-3"></p>
-      <div class="flex gap-3">
+  <div x-show="deleteConfirm.show" x-effect="document.body.classList.toggle('dialog-open', deleteConfirm.show || editor.open)" class="position-fixed overlay-inset dialog-layer d-flex align-items-center justify-content-center dialog-backdrop" @click.self="if (!deleteBusy) deleteConfirm.show = false" @keydown.escape="if (!deleteBusy) deleteConfirm.show = false">
+    <div role="dialog" aria-modal="true" aria-labelledby="delete-title" class="confirm-sheet">
+      <h3 id="delete-title" class="lead-size fw-bold text-dark mb-2">Delete this <span x-text="deleteConfirm.type"></span>?</h3>
+      <p class="small text-secondary mb-4">This action cannot be undone.</p>
+      <p role="alert" x-show="deleteError" x-text="deleteError" class="small text-danger mb-2"></p>
+      <div class="dialog-actions">
         <button @click="deleteConfirm.show = false" :disabled="deleteBusy"
-          class="flex-1 border border-gray-300 text-gray-700 font-medium py-2.5 rounded-lg text-sm transition-colors hover:bg-gray-50">Cancel</button>
+          class="btn flex-fill border border-light-subtle text-body-secondary fw-medium py-2 rounded-3 small">Cancel</button>
         <button @click="confirmDelete()" :disabled="deleteBusy"
-          class="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors" x-text="deleteBusy ? 'Deleting…' : 'Delete'"></button>
+          class="btn flex-fill btn-danger text-white fw-medium py-2 rounded-3 small" x-text="deleteBusy ? 'Deleting…' : 'Delete'"></button>
       </div>
     </div>
   </div>
 
   <!-- ===== MOBILE BOTTOM NAV ===== -->
-  <nav :inert="editor.open || deleteConfirm.show" aria-label="Main navigation" class="mobile-nav md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-40 flex safe-bottom">
+  <nav :inert="editor.open || deleteConfirm.show" aria-label="Main navigation" class="mobile-nav d-md-none safe-bottom">
     <template x-for="t in tabs" :key="t.id">
       <button @click="tab = t.id; onTabSwitch(t.id)" :aria-current="tab === t.id ? 'page' : null"
-        :class="tab === t.id ? 'text-blue-600' : 'text-gray-400'"
-        class="flex-1 flex flex-col items-center justify-center py-2 transition-colors">
-        <span class="icon text-2xl" x-html="icons[t.icon]"></span>
-        <span class="text-xs mt-0.5 font-medium" x-text="t.label"></span>
+        :class="tab === t.id ? 'text-primary' : 'text-secondary'"
+        class="btn mobile-nav-tab">
+        <span class="icon fs-4" x-html="icons[t.icon]"></span>
+        <span class="nav-label" x-text="t.label"></span>
       </button>
     </template>
   </nav>
